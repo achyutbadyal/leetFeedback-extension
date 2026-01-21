@@ -43,14 +43,14 @@ function mapTopicToCategory(topics) {
   if (!topics || !Array.isArray(topics) || topics.length === 0) {
     return null;
   }
-  
+
   for (const topic of topics) {
     const normalized = topic.toLowerCase().trim();
     if (CATEGORY_MAP[normalized] !== undefined) {
       return CATEGORY_MAP[normalized];
     }
   }
-  
+
   // No exact match found
   return null;
 }
@@ -221,25 +221,30 @@ class BackendAPI {
 
       // Calculate time taken (in seconds) from problem start to submission
       // Subtract pausedTime (time when tab was hidden) for accurate active time tracking
-      // Ensure timeTaken is valid: not negative, and capped at 24 hours (86400 seconds)
+      // This calculation matches the overlay display in problem-timer.js
       let timeTaken = 0;
       const pausedTime = storedProblemData.pausedTime || 0;
 
       if (problemStartTime && solved.date) {
         const totalElapsed = solved.date - problemStartTime; // Total elapsed time in ms
         const activeTime = totalElapsed - pausedTime; // Subtract time when tab was hidden
-        const rawTimeTaken = Math.floor(activeTime / 1000); // Convert ms to seconds
 
-        // Only use if positive and reasonable (within 24 hours)
-        if (rawTimeTaken > 0 && rawTimeTaken < 86400) {
-          timeTaken = rawTimeTaken;
-        } else if (rawTimeTaken <= 0) {
-          console.warn('[Backend API] Non-positive time detected, resetting to 0. Active time:', activeTime, 'ms');
+        // Validation matches problem-timer.js getElapsedActiveTime()
+        // Ensure elapsed time is always positive and reasonable
+        if (activeTime < 0) {
+          console.warn('[Backend API] Negative active time detected, resetting to 0. Active time:', activeTime, 'ms');
           timeTaken = 0;
         } else {
-          // Time is unreasonably large (> 24 hours), cap it
-          console.warn('[Backend API] Time taken exceeds 24 hours, capping. Raw value:', rawTimeTaken);
-          timeTaken = 86400; // Cap at 24 hours
+          // Cap at 24 hours (86400 seconds) to prevent overflow issues
+          const MAX_TIME_SECONDS = 24 * 60 * 60;
+          const rawTimeTaken = Math.floor(activeTime / 1000); // Convert ms to seconds
+
+          if (rawTimeTaken > MAX_TIME_SECONDS) {
+            console.warn('[Backend API] Time taken exceeds 24 hours, capping. Raw value:', rawTimeTaken);
+            timeTaken = MAX_TIME_SECONDS;
+          } else {
+            timeTaken = rawTimeTaken;
+          }
         }
       }
 

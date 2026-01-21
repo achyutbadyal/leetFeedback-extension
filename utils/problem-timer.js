@@ -133,7 +133,42 @@ class ProblemTimer {
     // Get current elapsed active time in milliseconds
     getElapsedActiveTime() {
         if (!this.startTime) return 0;
-        return Date.now() - this.startTime - this.pausedTime;
+
+        const now = Date.now();
+        const elapsed = now - this.startTime - this.pausedTime;
+
+        // Ensure elapsed time is always positive and reasonable
+        // If calculation results in negative or unreasonably large value, 
+        // it indicates corrupt state - return 0 to prevent display issues
+        if (elapsed < 0) {
+            console.warn('[ProblemTimer] Negative elapsed time detected, resetting calculation');
+            return 0;
+        }
+
+        // Cap at 24 hours (86400000ms) to prevent overflow issues
+        const MAX_TIME = 24 * 60 * 60 * 1000;
+        if (elapsed > MAX_TIME) {
+            console.warn('[ProblemTimer] Elapsed time exceeds 24h, capping');
+            return MAX_TIME;
+        }
+
+        return elapsed;
+    }
+
+    // Reset timer for current problem (called from overlay or when navigating to new problem)
+    async resetTimer() {
+        this.startTime = Date.now();
+        this.pausedTime = 0;
+        this.isTabHidden = document.hidden;
+        this.tabHiddenAt = null;
+
+        // Save reset state to storage
+        await this.saveToStorage();
+
+        // Update display immediately
+        this.updateDisplay();
+
+        console.log('[ProblemTimer] Timer reset for current problem');
     }
 
     // Get values for content scripts to use when saving problem data
@@ -280,8 +315,40 @@ class ProblemTimer {
             chrome.storage.sync.set({ timer_overlay_enabled: false });
         };
 
+        // Reset button
+        const resetBtn = document.createElement('button');
+        resetBtn.style.cssText = `
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: rgba(255, 255, 255, 0.6);
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    `;
+        resetBtn.textContent = '↺';
+        resetBtn.title = 'Reset timer';
+        resetBtn.onmouseover = () => {
+            resetBtn.style.background = 'rgba(255, 255, 255, 0.2)';
+            resetBtn.style.color = 'white';
+        };
+        resetBtn.onmouseout = () => {
+            resetBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+            resetBtn.style.color = 'rgba(255, 255, 255, 0.6)';
+        };
+        resetBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.resetTimer();
+        };
+
         this.overlay.appendChild(icon);
         this.overlay.appendChild(timeDisplay);
+        this.overlay.appendChild(resetBtn);
         this.overlay.appendChild(closeBtn);
 
         // Hover effects
