@@ -68,7 +68,7 @@
         // Detect if we've changed problems - reset counters if so
         const currentUrl = this.getCurrentProblemUrl();
         if (this.currentProblemUrl !== currentUrl) {
-          console.log(`[GeeksforGeeks Run Counter] Problem changed - resetting counters`);
+          debugLog(`[GeeksforGeeks Run Counter] Problem changed - resetting counters`);
           this.resetCounters();
           this.currentProblemUrl = currentUrl;
           await this.savePersistedState();
@@ -89,7 +89,7 @@
         const problemData = result[`problem_data_${currentUrl}`];
 
         if (problemData) {
-          console.log(`[GeeksforGeeks] Loaded problem data:`, problemData);
+          debugLog(`[GeeksforGeeks] Loaded problem data:`, problemData);
 
           // Extract tracking info from problem data if available
           this.attempts = problemData.attempts || [];
@@ -102,13 +102,13 @@
           this.currentProblemUrl = problemData.currentProblemUrl || currentUrl;
           this.topics = problemData.parent_topic || [];
 
-          console.log(`[GeeksforGeeks] Restored - Runs: ${this.runCounter}, Failed: ${this.incorrectRunCounter}/3, Analyzed: ${this.hasAnalyzedMistakes}, ShouldAnalyze: ${this.shouldAnalyzeWithGemini}`);
+          debugLog(`[GeeksforGeeks] Restored - Runs: ${this.runCounter}, Failed: ${this.incorrectRunCounter}/3, Analyzed: ${this.hasAnalyzedMistakes}, ShouldAnalyze: ${this.shouldAnalyzeWithGemini}`);
         } else {
-          console.log(`[GeeksforGeeks] No problem data found - starting fresh`);
+          debugLog(`[GeeksforGeeks] No problem data found - starting fresh`);
           this.topics = [];
         }
       } catch (error) {
-        console.error('[GeeksforGeeks] Error loading problem data:', error);
+        debugError('[GeeksforGeeks] Error loading problem data:', error);
       }
     }
 
@@ -137,9 +137,9 @@
         };
 
         await chrome.storage.local.set({ [`problem_data_${currentUrl}`]: problemData });
-        console.log(`[GeeksforGeeks] Saved problem data for: ${currentUrl}`);
+        debugLog(`[GeeksforGeeks] Saved problem data for: ${currentUrl}`);
       } catch (error) {
-        console.error('[GeeksforGeeks] Error saving problem data:', error);
+        debugError('[GeeksforGeeks] Error saving problem data:', error);
       }
     }
 
@@ -194,10 +194,10 @@
         };
 
         await chrome.storage.local.set({ [storageKey]: problemData });
-        console.log(`[GeeksforGeeks] Stored problem data:`, problemData);
+        debugLog(`[GeeksforGeeks] Stored problem data:`, problemData);
         return problemData;
       } catch (error) {
-        console.error('[GeeksforGeeks] Error storing problem data:', error);
+        debugError('[GeeksforGeeks] Error storing problem data:', error);
       }
     }
 
@@ -226,11 +226,11 @@
       this.aiAnalysis = null;
       this.aiTags = [];
       this.topics = [];
-      console.log(`[GeeksforGeeks] Counters reset for new problem`);
+      debugLog(`[GeeksforGeeks] Counters reset for new problem`);
 
       // Clean up any stored problem data for this problem
       const currentUrl = this.getCurrentProblemUrl();
-      chrome.storage.local.remove([`problem_data_${currentUrl}`]).catch(console.error);
+      chrome.storage.local.remove([`problem_data_${currentUrl}`]).catch(debugError);
     }
 
     setupEventListeners() {
@@ -324,7 +324,7 @@
     async handleRunAttempt() {
       try {
         this.runCounter++;
-        console.log(`[GeeksforGeeks Run Counter] Run attempt #${this.runCounter}`);
+        debugLog(`[GeeksforGeeks Run Counter] Run attempt #${this.runCounter}`);
 
         const code = this.getCurrentCode();
         const language = this.getCurrentLanguage();
@@ -342,7 +342,7 @@
           };
 
           this.attempts.push(attempt);
-          console.log(`[GeeksforGeeks Run Counter] Stored run attempt #${this.runCounter}`);
+          debugLog(`[GeeksforGeeks Run Counter] Stored run attempt #${this.runCounter}`);
 
           // Save state after adding attempt
           await this.savePersistedState();
@@ -351,7 +351,7 @@
           await this.observeRunResult(attempt);
 
         } else {
-          console.log(`[GeeksforGeeks Run Counter] Run #${this.runCounter} - Code too short or empty`);
+          debugLog(`[GeeksforGeeks Run Counter] Run #${this.runCounter} - Code too short or empty`);
         }
       } catch (error) {
         DSAUtils.logError(PLATFORM, 'Error storing run attempt', error);
@@ -384,7 +384,7 @@
               // Guard against multiple increments for the same attempt
               if (attempt.successful !== true) {
                 attempt.successful = true;
-                console.log(`[GeeksforGeeks Run Counter] Run #${attempt.runNumber} - SUCCESS (Expected output matched)`);
+                debugLog(`[GeeksforGeeks Run Counter] Run #${attempt.runNumber} - SUCCESS (Expected output matched)`);
 
                 // Save state after successful attempt
                 await this.savePersistedState();
@@ -404,8 +404,8 @@
               if (attempt.successful !== false) {
                 attempt.successful = false;
                 this.incorrectRunCounter++;
-                console.log(`[GeeksforGeeks Run Counter] Run #${attempt.runNumber} - FAILED (Incorrect output)`);
-                console.log(`[GeeksforGeeks Run Counter] Total failed runs: ${this.incorrectRunCounter}/3`);
+                debugLog(`[GeeksforGeeks Run Counter] Run #${attempt.runNumber} - FAILED (Incorrect output)`);
+                debugLog(`[GeeksforGeeks Run Counter] Total failed runs: ${this.incorrectRunCounter}/3`);
 
                 // Save state after failed attempt
                 await this.savePersistedState();
@@ -443,8 +443,8 @@
             // If we can't determine the result, assume it's a failed run for safety
             attempt.successful = false;
             this.incorrectRunCounter++;
-            console.log(`[GeeksforGeeks Run Counter] Run #${attempt.runNumber} - TIMEOUT → Counted as FAILED (safety measure)`);
-            console.log(`[GeeksforGeeks Run Counter] Total failed runs: ${this.incorrectRunCounter}/3`);
+            debugLog(`[GeeksforGeeks Run Counter] Run #${attempt.runNumber} - TIMEOUT → Counted as FAILED (safety measure)`);
+            debugLog(`[GeeksforGeeks Run Counter] Total failed runs: ${this.incorrectRunCounter}/3`);
 
             // Save state after failed attempt
             await this.savePersistedState();
@@ -460,7 +460,7 @@
 
     async handleThreeIncorrectRuns() {
       // Just set flag - Gemini analysis will run on successful submit before backend push
-      console.log(`[GeeksforGeeks] 3 failed runs detected - flagging for Gemini analysis on submit`);
+      debugLog(`[GeeksforGeeks] 3 failed runs detected - flagging for Gemini analysis on submit`);
       this.hasAnalyzedMistakes = true;
       this.shouldAnalyzeWithGemini = true;
       await this.savePersistedState({
@@ -887,8 +887,8 @@
 
     async handleSuccessfulSubmission() {
       try {
-        console.log(`[GeeksforGeeks Submission] SUCCESSFUL SUBMISSION DETECTED`);
-        console.log(`[GeeksforGeeks Stats] Total runs: ${this.runCounter}, Failed runs: ${this.incorrectRunCounter}`);
+        debugLog(`[GeeksforGeeks Submission] SUCCESSFUL SUBMISSION DETECTED`);
+        debugLog(`[GeeksforGeeks Stats] Total runs: ${this.runCounter}, Failed runs: ${this.incorrectRunCounter}`);
 
         DSAUtils.logDebug(PLATFORM, 'Handling successful submission');
 
@@ -947,7 +947,7 @@
 
         // Step 0: Run Gemini analysis if flagged (before backend push)
         if (this.shouldAnalyzeWithGemini) {
-          console.log(`[GeeksforGeeks Submission] Step 0: Running Gemini analysis before backend push...`);
+          debugLog(`[GeeksforGeeks Submission] Step 0: Running Gemini analysis before backend push...`);
           try {
             const geminiAPI = new GeminiAPI();
             const geminiConfigured = await geminiAPI.initialize();
@@ -955,53 +955,53 @@
             if (geminiConfigured) {
               // Send ALL attempts (not just failed) to Gemini for full context
               const allAttempts = this.attempts.filter(a => a.code && a.code.length > 10);
-              console.log(`[GeeksforGeeks] Sending ${allAttempts.length} code iterations to Gemini`);
+              debugLog(`[GeeksforGeeks] Sending ${allAttempts.length} code iterations to Gemini`);
 
               const geminiResult = await geminiAPI.analyzeMistakes(allAttempts, this.currentProblem);
 
               if (geminiResult.success) {
                 this.aiAnalysis = geminiResult.analysis;
                 this.aiTags = geminiResult.tags || [];
-                console.log(`[GeeksforGeeks] Gemini analysis complete. Tags: ${this.aiTags.join(', ')}`);
+                debugLog(`[GeeksforGeeks] Gemini analysis complete. Tags: ${this.aiTags.join(', ')}`);
               } else {
-                console.log(`[GeeksforGeeks] Gemini analysis failed: ${geminiResult.error}`);
+                debugLog(`[GeeksforGeeks] Gemini analysis failed: ${geminiResult.error}`);
               }
             } else {
-              console.log(`[GeeksforGeeks] Gemini API key not configured - skipping analysis`);
+              debugLog(`[GeeksforGeeks] Gemini API key not configured - skipping analysis`);
             }
           } catch (error) {
-            console.error(`[GeeksforGeeks] Gemini analysis error:`, error);
+            debugError(`[GeeksforGeeks] Gemini analysis error:`, error);
             // Continue with submission even if Gemini fails
           }
         }
 
         // Store problem data with AI analysis (will be picked up by backend push)
         await this.storeProblemData(this.currentProblem, true, totalTries);
-        console.log(`[GeeksforGeeks Submission] Stored problem as solved with ${totalTries} tries`);
+        debugLog(`[GeeksforGeeks Submission] Stored problem as solved with ${totalTries} tries`);
 
         // Step 1: Push to Backend API
-        console.log(`[GeeksforGeeks Submission] Step 1: Pushing to backend...`);
+        debugLog(`[GeeksforGeeks Submission] Step 1: Pushing to backend...`);
         try {
           if (!backendAPI) {
-            console.log(`[GeeksforGeeks Submission] Initializing BackendAPI...`);
+            debugLog(`[GeeksforGeeks Submission] Initializing BackendAPI...`);
             backendAPI = new BackendAPI();
             await backendAPI.initialize();
           }
 
           const currentUrl = this.getCurrentProblemUrl();
-          console.log(`[GeeksforGeeks Submission] Current problem URL: ${currentUrl}`);
+          debugLog(`[GeeksforGeeks Submission] Current problem URL: ${currentUrl}`);
 
           const backendResult = await backendAPI.pushCurrentProblemData(currentUrl);
 
           if (backendResult.success) {
-            console.log(`[GeeksforGeeks Submission] Backend push successful!`, backendResult.data);
+            debugLog(`[GeeksforGeeks Submission] Backend push successful!`, backendResult.data);
             // Show success toast
             if (window.LeetFeedbackToast) {
               const message = backendResult.data?.message || 'Solution synced to Traverse!';
               window.LeetFeedbackToast.success(message);
             }
           } else {
-            console.log(`[GeeksforGeeks Submission] Backend push failed: ${backendResult.error}`);
+            debugLog(`[GeeksforGeeks Submission] Backend push failed: ${backendResult.error}`);
             // Show error toast
             if (window.LeetFeedbackToast) {
               window.LeetFeedbackToast.error(`Sync failed: ${backendResult.error}`);
@@ -1009,7 +1009,7 @@
             // Continue with GitHub push even if backend fails
           }
         } catch (error) {
-          console.error(`[GeeksforGeeks Submission] Backend push error:`, error);
+          debugError(`[GeeksforGeeks Submission] Backend push error:`, error);
           // Show error toast
           if (window.LeetFeedbackToast) {
             window.LeetFeedbackToast.error(`Sync error: ${error.message}`);
@@ -1023,13 +1023,13 @@
 
         if (githubPushEnabled) {
           // Step 2: Push to GitHub
-          console.log(`[GeeksforGeeks Submission] Step 2: Pushing to GitHub...`);
+          debugLog(`[GeeksforGeeks Submission] Step 2: Pushing to GitHub...`);
           const result = await githubAPI.pushSolution(this.currentProblem, PLATFORM);
           DSAUtils.logDebug(PLATFORM, 'Push result:', result);
 
           if (result.success) {
             DSAUtils.logDebug(PLATFORM, 'Push successful!');
-            console.log(`[GeeksforGeeks Submission] Solution pushed to GitHub successfully!`);
+            debugLog(`[GeeksforGeeks Submission] Solution pushed to GitHub successfully!`);
 
             // Reset counters after successful submission
             this.runCounter = 0;
@@ -1052,10 +1052,10 @@
             });
           } else {
             DSAUtils.logError(PLATFORM, 'Push failed:', result.error);
-            console.log(`[GeeksforGeeks Submission] Failed to push solution:`, result.error);
+            debugLog(`[GeeksforGeeks Submission] Failed to push solution:`, result.error);
           }
         } else {
-          console.log(`[GeeksforGeeks Submission] GitHub push disabled by user - skipping`);
+          debugLog(`[GeeksforGeeks Submission] GitHub push disabled by user - skipping`);
           // Still reset counters
           this.runCounter = 0;
           this.incorrectRunCounter = 0;
@@ -1156,9 +1156,9 @@
     // Use singleton pattern to maintain state across page changes
     if (!extractorInstance) {
       extractorInstance = new GeeksforGeeksExtractor();
-      console.log(`[GeeksforGeeks Run Counter] Created new extractor instance`);
+      debugLog(`[GeeksforGeeks Run Counter] Created new extractor instance`);
     } else {
-      console.log(`[GeeksforGeeks Run Counter] Reusing existing extractor instance`);
+      debugLog(`[GeeksforGeeks Run Counter] Reusing existing extractor instance`);
     }
 
     await extractorInstance.initialize();

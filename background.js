@@ -1,13 +1,48 @@
 // Fixed background script
-console.log("Background script starting...");
+
+// Global debug mode cache for background script
+let _bgDebugMode = false;
+
+// Initialize debug mode cache
+chrome.storage.sync.get(['debug_mode'], (data) => {
+  _bgDebugMode = data.debug_mode || false;
+});
+
+// Listen for debug mode changes
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'sync' && changes.debug_mode) {
+    _bgDebugMode = changes.debug_mode.newValue || false;
+  }
+});
+
+// Debug-aware logging functions for background script
+function bgLog(...args) {
+  if (_bgDebugMode) {
+    console.log(...args);
+  }
+}
+
+function bgError(...args) {
+  if (_bgDebugMode) {
+    console.error(...args);
+  }
+}
+
+function bgWarn(...args) {
+  if (_bgDebugMode) {
+    console.warn(...args);
+  }
+}
+
+bgLog("Background script starting...");
 
 // Allow users to open the side panel by clicking on the action toolbar icon
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
-  .catch((error) => console.error(error));
+  .catch((error) => bgError(error));
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("DSA to GitHub Extension installed.");
+  bgLog("DSA to GitHub Extension installed.");
 
   // Initialize default settings
   chrome.storage.sync.get(['github_branch'], (data) => {
@@ -25,7 +60,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // Handle messages from content scripts and sidepanel
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log("Message received:", request.type);
+  bgLog("Message received:", request.type);
 
   try {
     if (request.type === 'getUserSolution') {
@@ -59,10 +94,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     // Unknown message type
-    console.log("Unknown message type:", request.type);
+    bgLog("Unknown message type:", request.type);
     sendResponse({ success: false, error: 'Unknown message type' });
   } catch (error) {
-    console.error("Error in message listener:", error);
+    bgError("Error in message listener:", error);
     sendResponse({ success: false, error: error.message });
   }
 });
@@ -87,7 +122,7 @@ async function handleGetUserSolution(request, sender, sendResponse) {
       sendResponse({ success: false, error: 'Platform not supported for solution extraction' });
     }
   } catch (error) {
-    console.error('Error getting user solution:', error);
+    bgError('Error getting user solution:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -97,7 +132,7 @@ async function handleAuthStateChanged(request, sender, sendResponse) {
   try {
     const { isAuthenticated, user } = request;
 
-    console.log('[Background] Auth state changed:', { isAuthenticated, user: user?.email });
+    bgLog('[Background] Auth state changed:', { isAuthenticated, user: user?.email });
 
     // Store auth data in local storage for extension access
     if (isAuthenticated && user) {
@@ -105,7 +140,7 @@ async function handleAuthStateChanged(request, sender, sendResponse) {
         firebase_user: user,
         auth_timestamp: Date.now()
       });
-      console.log('[Background] User authenticated and stored:', user.email);
+      bgLog('[Background] User authenticated and stored:', user.email);
 
       // Notify all extension contexts about auth change
       try {
@@ -119,7 +154,7 @@ async function handleAuthStateChanged(request, sender, sendResponse) {
       }
     } else {
       await chrome.storage.local.remove(['firebase_user', 'auth_timestamp']);
-      console.log('[Background] User signed out, data cleared');
+      bgLog('[Background] User signed out, data cleared');
 
       // Notify all extension contexts about auth change
       try {
@@ -135,7 +170,7 @@ async function handleAuthStateChanged(request, sender, sendResponse) {
 
     sendResponse({ success: true });
   } catch (error) {
-    console.error('Error handling auth state change:', error);
+    bgError('Error handling auth state change:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -143,7 +178,7 @@ async function handleAuthStateChanged(request, sender, sendResponse) {
 // Handle content script ready notification
 async function handleContentScriptReady(request, sender, sendResponse) {
   try {
-    console.log('[Background] Content script ready on:', request.url);
+    bgLog('[Background] Content script ready on:', request.url);
 
     // Check if we have cached auth data and should sync it
     const result = await chrome.storage.local.get(['firebase_user', 'auth_timestamp']);
@@ -153,18 +188,18 @@ async function handleContentScriptReady(request, sender, sendResponse) {
       const maxAge = 24 * 60 * 60 * 1000; // 24 hours
 
       if (cacheAge < maxAge) {
-        console.log('[Background] Syncing cached auth data to content script');
+        bgLog('[Background] Syncing cached auth data to content script');
         // Request fresh auth status from the website
         setTimeout(() => {
           chrome.tabs.sendMessage(sender.tab.id, {
             type: 'AUTH_STATUS_REQUEST'
           }, (response) => {
             if (chrome.runtime.lastError) {
-              console.log('Tab message failed:', chrome.runtime.lastError);
+              bgLog('Tab message failed:', chrome.runtime.lastError);
               return;
             }
             if (response && response.isAuthenticated) {
-              console.log('[Background] Auth status confirmed from website');
+              bgLog('[Background] Auth status confirmed from website');
             }
           });
         }, 1000);
@@ -173,7 +208,7 @@ async function handleContentScriptReady(request, sender, sendResponse) {
 
     sendResponse({ success: true });
   } catch (error) {
-    console.error('Error handling content script ready:', error);
+    bgError('Error handling content script ready:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -181,7 +216,7 @@ async function handleContentScriptReady(request, sender, sendResponse) {
 async function handleBackendAPIFetch(request, sender, sendResponse) {
   try {
     const { url, options } = request;
-    console.log(`[Background] Making backend API request to: ${url}`);
+    bgLog(`[Background] Making backend API request to: ${url}`);
 
     const response = await fetch(url, options);
     const data = await response.json();
@@ -192,7 +227,7 @@ async function handleBackendAPIFetch(request, sender, sendResponse) {
       data: data
     });
   } catch (error) {
-    console.error('[Background] Backend API fetch error:', error);
+    bgError('[Background] Backend API fetch error:', error);
     sendResponse({
       success: false,
       error: error.message
@@ -378,7 +413,7 @@ async function handleInitializeConfig(request, sender, sendResponse) {
 
     sendResponse({ success: true, config });
   } catch (error) {
-    console.error('Error initializing config:', error);
+    bgError('Error initializing config:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -387,7 +422,7 @@ async function handleInitializeConfig(request, sender, sendResponse) {
 async function handleBackendAPIFetch(request, sender, sendResponse) {
   try {
     const { url, options } = request;
-    console.log(`[Background] Making backend API request to: ${url}`);
+    bgLog(`[Background] Making backend API request to: ${url}`);
 
     const response = await fetch(url, options);
     const data = await response.json();
@@ -398,7 +433,7 @@ async function handleBackendAPIFetch(request, sender, sendResponse) {
       data: data
     });
   } catch (error) {
-    console.error('[Background] Backend API fetch error:', error);
+    bgError('[Background] Backend API fetch error:', error);
     sendResponse({
       success: false,
       error: error.message
@@ -406,4 +441,4 @@ async function handleBackendAPIFetch(request, sender, sendResponse) {
   }
 }
 
-console.log("Background script loaded successfully");
+bgLog("Background script loaded successfully");

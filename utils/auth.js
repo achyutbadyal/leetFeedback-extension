@@ -1,5 +1,32 @@
 'use strict';
 
+// Debug mode cache for auth.js
+let _authDebugMode = false;
+
+// Initialize debug mode cache
+if (typeof chrome !== 'undefined' && chrome.storage?.sync) {
+  chrome.storage.sync.get(['debug_mode'], (data) => {
+    _authDebugMode = data.debug_mode || false;
+  });
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && changes.debug_mode) {
+      _authDebugMode = changes.debug_mode.newValue || false;
+    }
+  });
+}
+
+// Debug-aware logging functions
+function authDbgLog(...args) {
+  if (_authDebugMode) console.log(...args);
+}
+function authDbgError(...args) {
+  if (_authDebugMode) console.error(...args);
+}
+function authDbgWarn(...args) {
+  if (_authDebugMode) console.warn(...args);
+}
+
 class ExtensionAuth {
   constructor(options = {}) {
     this.apiBaseUrl = options.baseUrl || this.getApiBaseUrl();
@@ -56,7 +83,7 @@ class ExtensionAuth {
         silent: true,
       });
     } catch (error) {
-      console.error('[ExtensionAuth] Error syncing auth state:', error);
+      authDbgError('[ExtensionAuth] Error syncing auth state:', error);
       await this.updateAuthStatus(false, null, null, {
         persist: false,
         silent: true,
@@ -136,7 +163,7 @@ class ExtensionAuth {
     try {
       response = await this.fetchImpl(url, init);
     } catch (networkError) {
-      console.error('[ExtensionAuth] Network error:', networkError);
+      authDbgError('[ExtensionAuth] Network error:', networkError);
       throw new Error('Unable to reach authentication service. Check your connection.');
     }
 
@@ -187,7 +214,7 @@ class ExtensionAuth {
       };
 
     if (!token) {
-      console.warn('[ExtensionAuth] Login succeeded but token missing from response.');
+      authDbgWarn('[ExtensionAuth] Login succeeded but token missing from response.');
     }
 
     await this.updateAuthStatus(true, user, token || null);
@@ -284,7 +311,7 @@ class ExtensionAuth {
       try {
         callback(snapshot);
       } catch (error) {
-        console.error('[ExtensionAuth] Auth callback failed:', error);
+        authDbgError('[ExtensionAuth] Auth callback failed:', error);
       }
     });
   }
@@ -339,7 +366,7 @@ class ExtensionAuth {
         active: true,
       });
     } catch (error) {
-      console.error('[ExtensionAuth] Failed to open sign-in page:', error);
+      authDbgError('[ExtensionAuth] Failed to open sign-in page:', error);
       throw error;
     }
   }
@@ -351,7 +378,7 @@ if (typeof chrome !== 'undefined' && chrome.storage?.local) {
   extensionAuth
     .init()
     .catch((error) =>
-      console.error('[ExtensionAuth] Failed to initialize auth:', error),
+      authDbgError('[ExtensionAuth] Failed to initialize auth:', error),
     );
 }
 

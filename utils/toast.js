@@ -187,4 +187,9 @@ class ToastNotification {
 
 // Create global instance
 window.LeetFeedbackToast = new ToastNotification();
-console.log('[Toast] Toast notification utility loaded');
+// Use debug-aware logging if available
+if (typeof debugLog === 'function') {
+    debugLog('[Toast] Toast notification utility loaded');
+} else if (typeof window !== 'undefined' && typeof window.isDebugMode === 'function' && window.isDebugMode()) {
+    console.log('[Toast] Toast notification utility loaded');
+}

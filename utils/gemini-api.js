@@ -54,10 +54,12 @@ class GeminiAPI {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error(
-                    `[Gemini API] Error ${response.status}:`,
-                    errorText,
-                );
+                // Use debug-aware error logging
+                if (typeof debugError === 'function') {
+                    debugError(`[Gemini API] Error ${response.status}:`, errorText);
+                } else if (typeof window !== 'undefined' && typeof window.isDebugMode === 'function' && window.isDebugMode()) {
+                    console.error(`[Gemini API] Error ${response.status}:`, errorText);
+                }
                 throw new Error(
                     `Gemini API responded with ${response.status}: ${errorText}`,
                 );

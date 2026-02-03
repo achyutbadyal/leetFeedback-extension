@@ -60,7 +60,32 @@ class BackendAPI {
     this.baseURL = 'https://traverse-backend-api.azurewebsites.net';
     this.authToken = null;
     this.initialized = false;
-    console.log(`[Backend API] BackendAPI constructor called`);
+    this._log(`[Backend API] BackendAPI constructor called`);
+  }
+
+  // Debug-aware logging methods
+  _log(...args) {
+    if (typeof debugLog === 'function') {
+      debugLog(...args);
+    } else if (typeof window !== 'undefined' && typeof window.isDebugMode === 'function' && window.isDebugMode()) {
+      console.log(...args);
+    }
+  }
+
+  _error(...args) {
+    if (typeof debugError === 'function') {
+      debugError(...args);
+    } else if (typeof window !== 'undefined' && typeof window.isDebugMode === 'function' && window.isDebugMode()) {
+      console.error(...args);
+    }
+  }
+
+  _warn(...args) {
+    if (typeof debugWarn === 'function') {
+      debugWarn(...args);
+    } else if (typeof window !== 'undefined' && typeof window.isDebugMode === 'function' && window.isDebugMode()) {
+      console.warn(...args);
+    }
   }
 
   async initialize() {
@@ -70,26 +95,26 @@ class BackendAPI {
       this.authToken = result.auth_token;
       this.initialized = true;
 
-      console.log('[Backend API] Raw token from storage:', this.authToken);
-      console.log('[Backend API] Token type:', typeof this.authToken);
-      console.log('[Backend API] Token starts with Bearer?', this.authToken ? this.authToken.startsWith('Bearer ') : false);
+      this._log('[Backend API] Raw token from storage:', this.authToken);
+      this._log('[Backend API] Token type:', typeof this.authToken);
+      this._log('[Backend API] Token starts with Bearer?', this.authToken ? this.authToken.startsWith('Bearer ') : false);
 
       if (!this.authToken) {
-        console.warn('[Backend API] No authentication token found');
+        this._warn('[Backend API] No authentication token found');
         // Let's also check all auth-related storage keys
         const allAuthData = await chrome.storage.local.get(null);
         const authKeys = Object.keys(allAuthData).filter(key => key.includes('auth') || key.includes('token'));
-        console.log('[Backend API] Available auth-related keys:', authKeys);
+        this._log('[Backend API] Available auth-related keys:', authKeys);
         authKeys.forEach(key => {
-          console.log(`[Backend API] ${key}:`, allAuthData[key]);
+          this._log(`[Backend API] ${key}:`, allAuthData[key]);
         });
         return false;
       }
 
-      console.log('[Backend API] Initialized successfully');
+      this._log('[Backend API] Initialized successfully');
       return true;
     } catch (error) {
-      console.error('[Backend API] Error during initialization:', error);
+      this._error('[Backend API] Error during initialization:', error);
       return false;
     }
   }
@@ -136,9 +161,9 @@ class BackendAPI {
         throw new Error('No authentication token available');
       }
 
-      console.log('[Backend API] Pushing submission data:', problemData);
-      console.log('[Backend API] Raw auth token:', this.authToken);
-      console.log('[Backend API] Token length:', this.authToken ? this.authToken.length : 0);
+      this._log('[Backend API] Pushing submission data:', problemData);
+      this._log('[Backend API] Raw auth token:', this.authToken);
+      this._log('[Backend API] Token length:', this.authToken ? this.authToken.length : 0);
 
       // Use background script to make the fetch call (bypasses CORS)
       const response = await new Promise((resolve, reject) => {
@@ -169,16 +194,16 @@ class BackendAPI {
         // Handle both HTTP errors (with status/data) and fetch errors (with error property)
         const errorStatus = response.status || 'unknown';
         const errorDetails = response.error || response.data || 'No details available';
-        console.error('[Backend API] Push failed:', errorStatus, errorDetails);
+        this._error('[Backend API] Push failed:', errorStatus, errorDetails);
         throw new Error(`Backend API error: ${errorStatus} - ${typeof errorDetails === 'object' ? JSON.stringify(errorDetails) : errorDetails}`);
       }
 
-      console.log('[Backend API] Submission data pushed successfully! Status:', response.status);
-      console.log('[Backend API] Backend response:', response.data);
+      this._log('[Backend API] Submission data pushed successfully! Status:', response.status);
+      this._log('[Backend API] Backend response:', response.data);
       return { success: true, data: response.data };
 
     } catch (error) {
-      console.error('[Backend API] Error pushing submission data:', error);
+      this._error('[Backend API] Error pushing submission data:', error);
       return { success: false, error: error.message };
     }
   }

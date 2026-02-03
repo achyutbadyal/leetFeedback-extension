@@ -6,12 +6,37 @@ class GitHubAPI {
     this.config = null;
   }
 
+  // Debug-aware logging (uses global debugLog/debugError if available, otherwise checks debug mode)
+  _log(...args) {
+    if (typeof debugLog === 'function') {
+      debugLog(...args);
+    } else if (typeof window !== 'undefined' && window.isDebugMode && window.isDebugMode()) {
+      console.log(...args);
+    }
+  }
+
+  _error(...args) {
+    if (typeof debugError === 'function') {
+      debugError(...args);
+    } else if (typeof window !== 'undefined' && window.isDebugMode && window.isDebugMode()) {
+      console.error(...args);
+    }
+  }
+
+  _warn(...args) {
+    if (typeof debugWarn === 'function') {
+      debugWarn(...args);
+    } else if (typeof window !== 'undefined' && window.isDebugMode && window.isDebugMode()) {
+      console.warn(...args);
+    }
+  }
+
   async initialize() {
     try {
       this.config = await DSAUtils.getStoredConfig();
       return DSAUtils.isConfigComplete(this.config);
     } catch (error) {
-      console.error('[GitHub API] Error during initialization:', error);
+      this._error('[GitHub API] Error during initialization:', error);
       return false;
     }
   }
@@ -151,7 +176,7 @@ class GitHubAPI {
       }
 
       const { title } = problemInfo;
-      console.log(`[GitHub API] Pushing content for: ${title}`);
+      this._log(`[GitHub API] Pushing content for: ${title}`);
 
       // Create directory path and always use solution.md
       const dirPath = DSAUtils.createDirectoryPath(platform, problemInfo);
@@ -163,7 +188,7 @@ class GitHubAPI {
         // Successful solution - just the solution
         content = this.generateSolutionContent(problemInfo, platform);
         commitMessage = `Add solution for ${title}`;
-        console.log(`[GitHub API] Creating successful solution`);
+        this._log(`[GitHub API] Creating successful solution`);
         
       } else if (contentType === 'mistake-analysis') {
         // Failed attempts - solution + mistake analysis
@@ -191,7 +216,7 @@ class GitHubAPI {
         // Create combined content: final solution + mistake analysis
         content = this.generateSolutionWithMistakeAnalysis(problemInfo, platform, finalAttempt, analysisResult.analysis, failedAttempts);
         commitMessage = `Add solution with mistake analysis for ${title} (${failedAttempts.length} attempts analyzed)`;
-        console.log(`[GitHub API] Creating solution with mistake analysis`);
+        this._log(`[GitHub API] Creating solution with mistake analysis`);
       }
 
       // Check if solution.md already exists for updates
@@ -203,7 +228,7 @@ class GitHubAPI {
       const result = await this.createOrUpdateFile(filePath, content, commitMessage, sha);
 
       if (result.success) {
-        console.log(`[GitHub API] Content pushed successfully: ${filePath}`);
+        this._log(`[GitHub API] Content pushed successfully: ${filePath}`);
         // Return analysis with result so it can be stored for backend submission
         return { ...result, analysis: analysisResult.analysis };
       }
@@ -211,7 +236,7 @@ class GitHubAPI {
       return result;
 
     } catch (error) {
-      console.error(`[GitHub API] Error pushing content:`, error);
+      this._error(`[GitHub API] Error pushing content:`, error);
       return { success: false, error: error.message };
     }
   }
@@ -221,7 +246,7 @@ class GitHubAPI {
     try {
       return await this.pushContent(problemInfo, platform, 'solution');
     } catch (error) {
-      console.error('[GitHub API] Error in pushSolution:', error);
+      this._error('[GitHub API] Error in pushSolution:', error);
       return { success: false, error: error.message };
     }
   }
@@ -230,7 +255,7 @@ class GitHubAPI {
     try {
       return await this.pushContent(problemInfo, platform, 'mistake-analysis');
     } catch (error) {
-      console.error('[GitHub API] Error in pushMistakeAnalysis:', error);
+      this._error('[GitHub API] Error in pushMistakeAnalysis:', error);
       return { success: false, error: error.message };
     }
   }
@@ -313,14 +338,14 @@ ${mistakeAnalysis}
       // First try the standard method
       return btoa(unescape(encodeURIComponent(content)));
     } catch (error) {
-      console.warn('[GitHub API] Standard encoding failed, trying alternative method:', error);
+      this._warn('[GitHub API] Standard encoding failed, trying alternative method:', error);
       try {
         // Alternative method using TextEncoder
         const encoder = new TextEncoder();
         const uint8Array = encoder.encode(content);
         return btoa(String.fromCharCode(...uint8Array));
       } catch (fallbackError) {
-        console.error('[GitHub API] All encoding methods failed:', fallbackError);
+        this._error('[GitHub API] All encoding methods failed:', fallbackError);
         // Last resort: remove problematic characters
         const cleanContent = content.replace(/[^\x00-\x7F]/g, "?");
         return btoa(cleanContent);

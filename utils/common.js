@@ -6,6 +6,76 @@ const DSA_PLATFORMS = {
   TAKEUFORWARD: 'takeuforward'
 };
 
+// Global debug mode cache for synchronous access
+let _debugModeCache = false;
+let _debugModeCacheInitialized = false;
+
+// Initialize debug mode cache on load
+(async function initDebugCache() {
+  try {
+    const result = await chrome.storage.sync.get(['debug_mode']);
+    _debugModeCache = result.debug_mode || false;
+    _debugModeCacheInitialized = true;
+  } catch (e) {
+    // Ignore - storage may not be available
+  }
+})();
+
+// Listen for debug mode changes
+try {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && changes.debug_mode) {
+      _debugModeCache = changes.debug_mode.newValue || false;
+    }
+  });
+} catch (e) {
+  // Ignore - may not be in extension context
+}
+
+/**
+ * Synchronous debug log function - logs only if debug mode is enabled
+ * @param {...any} args - Arguments to pass to console.log
+ */
+function debugLog(...args) {
+  if (_debugModeCache) {
+    console.log(...args);
+  }
+}
+
+/**
+ * Synchronous debug error function - logs only if debug mode is enabled
+ * @param {...any} args - Arguments to pass to console.error
+ */
+function debugError(...args) {
+  if (_debugModeCache) {
+    console.error(...args);
+  }
+}
+
+/**
+ * Synchronous debug warn function - logs only if debug mode is enabled
+ * @param {...any} args - Arguments to pass to console.warn
+ */
+function debugWarn(...args) {
+  if (_debugModeCache) {
+    console.warn(...args);
+  }
+}
+
+/**
+ * Check if debug mode is enabled (synchronous)
+ * @returns {boolean}
+ */
+function isDebugMode() {
+  return _debugModeCache;
+}
+
+// Make debug functions available globally
+window.debugLog = debugLog;
+window.debugError = debugError;
+window.debugWarn = debugWarn;
+window.isDebugMode = isDebugMode;
+
 const LANGUAGE_EXTENSIONS = {
   'C++': '.cpp',
   'cpp': '.cpp',
@@ -162,27 +232,21 @@ class DSAUtils {
   }
 
   static async logDebug(platform, message, data = null) {
-    const debugMode = await this.getDebugMode();
-    if (debugMode) {
+    if (_debugModeCache) {
       const timestamp = new Date().toISOString();
       console.log(`[DSA-to-GitHub][${platform}][${timestamp}] ${message}`, data || '');
     }
   }
 
   static async logError(platform, message, error = null) {
-    const debugMode = await this.getDebugMode();
-    if (debugMode) {
+    if (_debugModeCache) {
       const timestamp = new Date().toISOString();
       console.error(`[DSA-to-GitHub][${platform}][${timestamp}] ${message}`, error || '');
     }
   }
 
   static async getDebugMode() {
-    return new Promise((resolve) => {
-      chrome.storage.sync.get(['debug_mode'], (data) => {
-        resolve(data.debug_mode || false);
-      });
-    });
+    return _debugModeCache;
   }
 }
 

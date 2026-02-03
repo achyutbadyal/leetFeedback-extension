@@ -1,3 +1,31 @@
+// Global debug mode cache for sidepanel
+let _spDebugMode = false;
+
+// Initialize debug mode cache
+chrome.storage.sync.get(['debug_mode'], (data) => {
+  _spDebugMode = data.debug_mode || false;
+});
+
+// Listen for debug mode changes
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'sync' && changes.debug_mode) {
+    _spDebugMode = changes.debug_mode.newValue || false;
+  }
+});
+
+// Debug-aware logging functions for sidepanel
+function spLog(...args) {
+  if (_spDebugMode) {
+    console.log(...args);
+  }
+}
+
+function spError(...args) {
+  if (_spDebugMode) {
+    console.error(...args);
+  }
+}
+
 class PopupController {
   constructor() {
     this.config = {};
@@ -86,7 +114,7 @@ class PopupController {
         this.config.githubPushEnabled = e.target.checked;
         chrome.storage.sync.set({ github_push_enabled: e.target.checked });
         this.toggleGitHubConfig(e.target.checked);
-        console.log("GitHub push enabled:", e.target.checked);
+        spLog("GitHub push enabled:", e.target.checked);
       });
     }
 
@@ -96,7 +124,7 @@ class PopupController {
       timerOverlayCheckbox.addEventListener("change", (e) => {
         this.config.timerOverlayEnabled = e.target.checked;
         chrome.storage.sync.set({ timer_overlay_enabled: e.target.checked });
-        console.log("Timer overlay enabled:", e.target.checked);
+        spLog("Timer overlay enabled:", e.target.checked);
       });
     }
 
@@ -106,6 +134,7 @@ class PopupController {
       debugModeCheckbox.addEventListener("change", (e) => {
         this.config.debugMode = e.target.checked;
         chrome.storage.sync.set({ debug_mode: e.target.checked });
+        // Always log debug mode toggle so user can see it working
         console.log("Debug mode enabled:", e.target.checked);
       });
     }
@@ -376,7 +405,7 @@ class PopupController {
         this.updateConnectionStatus();
       }, 500);
     } catch (error) {
-      console.error(`Failed to save: ${error.message}`);
+      spError(`Failed to save: ${error.message}`);
     }
   }
 
@@ -429,7 +458,7 @@ class PopupController {
   // Authentication methods
   async initializeAuth() {
     try {
-      console.log("[Popup] Initializing auth...");
+      spLog("[Popup] Initializing auth...");
 
       // Check local storage for cached auth data first
       const result = await chrome.storage.local.get([
@@ -445,7 +474,7 @@ class PopupController {
       if (result.auth_user && result.auth_timestamp) {
         const cacheAge = now - result.auth_timestamp;
         if (cacheAge < maxAge) {
-          console.log("[Popup] Found cached backend auth data");
+          spLog("[Popup] Found cached backend auth data");
           this.authStatus = {
             isAuthenticated: true,
             user: result.auth_user,
@@ -456,7 +485,7 @@ class PopupController {
       } else if (result.firebase_user && result.auth_timestamp) {
         const cacheAge = now - result.auth_timestamp;
         if (cacheAge < maxAge) {
-          console.log("[Popup] Found legacy cached auth data");
+          spLog("[Popup] Found legacy cached auth data");
           this.authStatus = {
             isAuthenticated: true,
             user: result.firebase_user,
@@ -468,9 +497,9 @@ class PopupController {
 
       // Set up auth utility if available
       if (typeof extensionAuth !== "undefined") {
-        console.log("[Popup] Setting up extension auth listener");
+        spLog("[Popup] Setting up extension auth listener");
         extensionAuth.onAuthStatusChange((authStatus) => {
-          console.log("[Popup] Auth status changed:", authStatus);
+          spLog("[Popup] Auth status changed:", authStatus);
           this.authStatus = {
             isAuthenticated: authStatus.isAuthenticated,
             user: authStatus.user || null,
@@ -483,7 +512,7 @@ class PopupController {
         // Request fresh auth status
         extensionAuth.requestAuthStatus();
       } else {
-        console.log(
+        spLog(
           "[Popup] Extension auth not available, updating auth section",
         );
         this.updateAuthSection();
@@ -492,7 +521,7 @@ class PopupController {
       // Listen for auth updates from background script
       chrome.runtime.onMessage.addListener((message) => {
         if (message.type === "AUTH_UPDATE") {
-          console.log("[Popup] Received auth update from background:", message);
+          spLog("[Popup] Received auth update from background:", message);
           this.authStatus = {
             isAuthenticated: message.isAuthenticated,
             user: message.user,
@@ -502,7 +531,7 @@ class PopupController {
         }
       });
     } catch (error) {
-      console.error("Error initializing auth:", error);
+      spError("Error initializing auth:", error);
     }
   }
 
@@ -634,7 +663,7 @@ class PopupController {
 
   async openSignIn() {
     try {
-      console.log("[Popup] Opening sign in...");
+      spLog("[Popup] Opening sign in...");
 
       if (typeof extensionAuth !== "undefined") {
         await extensionAuth.openSignIn();
@@ -662,7 +691,7 @@ class PopupController {
         });
       }
     } catch (error) {
-      console.error("Error opening sign in:", error);
+      spError("Error opening sign in:", error);
       this.showMessage("Failed to open sign in. Please try again.", "error");
     }
   }
@@ -686,7 +715,7 @@ class PopupController {
         });
       }
     } catch (error) {
-      console.error("Error opening website:", error);
+      spError("Error opening website:", error);
     }
   }
 
@@ -713,7 +742,7 @@ class PopupController {
         this.showAuthFeedback("success", "Signed out locally.");
       }
     } catch (error) {
-      console.error("Error signing out:", error);
+      spError("Error signing out:", error);
       // Even if sign out fails, clear local state
       await chrome.storage.local.remove([
         "auth_user",
@@ -785,7 +814,7 @@ class PopupController {
       this.renderUpdateNotification(hasUpdate, latestVersion, currentVersion, release.html_url);
 
     } catch (error) {
-      console.error("[Update Check] Error:", error);
+      spError("[Update Check] Error:", error);
       updateNotification.innerHTML = `
         <div class="update-uptodate">
           <span class="update-uptodate-icon">✓</span>
@@ -864,7 +893,7 @@ class PopupController {
         }
       } catch (e) {
         // Token might not be JWT or is malformed
-        console.log("[Session] Could not decode token:", e);
+        spLog("[Session] Could not decode token:", e);
       }
 
       // Fallback: estimate expiration from auth_timestamp (assume 7 days)
@@ -921,7 +950,7 @@ class PopupController {
         `;
       }
     } catch (error) {
-      console.error("[Session Status] Error:", error);
+      spError("[Session Status] Error:", error);
       sessionStatus.style.display = "none";
     }
   }

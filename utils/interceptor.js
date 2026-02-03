@@ -3,6 +3,17 @@
 (function () {
   'use strict';
 
+  // Debug mode is controlled via window.__TUF_DEBUG__ set by content script before injection
+  const DEBUG_MODE = window.__TUF_DEBUG__ || false;
+  
+  function log(...args) {
+    if (DEBUG_MODE) console.log(...args);
+  }
+  
+  function error(...args) {
+    if (DEBUG_MODE) console.error(...args);
+  }
+
   const XHR = XMLHttpRequest.prototype;
   const open = XHR.open;
   const send = XHR.send;
@@ -14,18 +25,18 @@
   };
 
   XHR.send = function (body) {
-    console.log('[TUF Interceptor] XHR send called for URL:', this.url, 'Method:', this.method);
+    log('[TUF Interceptor] XHR send called for URL:', this.url, 'Method:', this.method);
 
     // Intercept submit request to capture code
     if (
       this.url.includes('backend-go.takeuforward.org/api/v1/plus/judge/submit') &&
       this.method.toLowerCase() === 'post'
     ) {
-      console.log('[TUF Interceptor] Intercepting submit request...');
-      console.log('[TUF Interceptor] Submit body:', body);
+      log('[TUF Interceptor] Intercepting submit request...');
+      log('[TUF Interceptor] Submit body:', body);
       try {
         const payload = JSON.parse(body);
-        console.log('[TUF Interceptor] Submit payload:', payload);
+        log('[TUF Interceptor] Submit payload:', payload);
 
         window.postMessage(
           {
@@ -39,13 +50,13 @@
           '*',
         );
       } catch (error) {
-        console.error('[TUF Interceptor] Error parsing submit payload:', error);
+        error('[TUF Interceptor] Error parsing submit payload:', error);
       }
     } else if (
       this.url.includes('backend-go.takeuforward.org/api/v1/plus/judge/run') &&
       this.method.toLowerCase() === 'post'
     ) {
-      console.log('[TUF Interceptor] Intercepting run request...');
+      log('[TUF Interceptor] Intercepting run request...');
       try {
         const payload = JSON.parse(body);
         window.postMessage(
@@ -60,21 +71,21 @@
           '*',
         );
       } catch (error) {
-        console.error('[TUF Interceptor] Error parsing run payload:', error);
+        error('[TUF Interceptor] Error parsing run payload:', error);
       }
     }
 
     // Add load event listener to capture responses
     this.addEventListener('load', function () {
-      console.log('[TUF Interceptor] XHR load for URL:', this.url);
+      log('[TUF Interceptor] XHR load for URL:', this.url);
       try {
         if (
           this.url.includes('backend-go.takeuforward.org/api/v1/plus/judge/check-submit') &&
           this.method.toLowerCase() === 'get'
         ) {
-          console.log('[TUF Interceptor] Intercepting submission check response...');
+          log('[TUF Interceptor] Intercepting submission check response...');
           const response = JSON.parse(this.responseText);
-          console.log('[TUF Interceptor] Submission check response:', response);
+          log('[TUF Interceptor] Submission check response:', response);
 
           if (response.success && response.data) {
             const data = response.data;
@@ -86,7 +97,7 @@
               averageTime: data.time + 's',
               averageMemory: data.memory,
             };
-            console.log('[TUF Interceptor] Processed submission data:', submissionData);
+            log('[TUF Interceptor] Processed submission data:', submissionData);
 
             // Send data back to content script
             window.postMessage(
@@ -97,7 +108,7 @@
               '*',
             );
           } else {
-            console.log('[TUF Interceptor] Submission check not successful or no data');
+            log('[TUF Interceptor] Submission check not successful or no data');
           }
         }
 
@@ -106,9 +117,9 @@
           this.url.includes('backend-go.takeuforward.org/api/v1/plus/judge/check-run') &&
           this.method.toLowerCase() === 'get'
         ) {
-          console.log('[TUF Interceptor] Intercepting run check response...');
+          log('[TUF Interceptor] Intercepting run check response...');
           const response = JSON.parse(this.responseText);
-          console.log('[TUF Interceptor] Run check response:', response);
+          log('[TUF Interceptor] Run check response:', response);
 
           if (response.success && response.data) {
             const data = response.data;
@@ -118,7 +129,7 @@
               totalTestCases: data.total_test_cases,
               passedTestCases: data.passed_test_cases,
             };
-            console.log('[TUF Interceptor] Processed run data:', runData);
+            log('[TUF Interceptor] Processed run data:', runData);
 
             window.postMessage(
               {
@@ -130,12 +141,12 @@
           }
         }
       } catch (error) {
-        console.error('[TUF Interceptor] Error in interceptor:', error);
+        error('[TUF Interceptor] Error in interceptor:', error);
       }
     });
 
     return send.apply(this, arguments);
   };
 
-  console.log('[TUF Interceptor] TakeUforward submission interceptor loaded');
+  log('[TUF Interceptor] TakeUforward submission interceptor loaded');
 })();

@@ -2,6 +2,34 @@
 (function() {
   'use strict';
 
+  // Global debug mode cache for this content script
+  let _authDebugMode = false;
+
+  // Initialize debug mode cache
+  chrome.storage.sync.get(['debug_mode'], (data) => {
+    _authDebugMode = data.debug_mode || false;
+  });
+
+  // Listen for debug mode changes
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && changes.debug_mode) {
+      _authDebugMode = changes.debug_mode.newValue || false;
+    }
+  });
+
+  // Debug-aware logging functions for this content script
+  function authLog(...args) {
+    if (_authDebugMode) {
+      console.log(...args);
+    }
+  }
+
+  function authError(...args) {
+    if (_authDebugMode) {
+      console.error(...args);
+    }
+  }
+
   // Only run on the LeetFeedback website
   const isLeetFeedbackSite = window.location.hostname.includes('leet-feedback') || 
                             window.location.hostname.includes('leetfeedback') || 
@@ -10,7 +38,7 @@
 
   if (!isLeetFeedbackSite) return;
 
-  console.log('[LeetFeedback Extension] Website auth content script loaded on:', window.location.hostname);
+  authLog('[LeetFeedback Extension] Website auth content script loaded on:', window.location.hostname);
 
   // Notify extension that content script is ready
   chrome.runtime.sendMessage({
@@ -22,7 +50,7 @@
 
   // Message handler for extension communication
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log('[LeetFeedback Extension] Received message:', message);
+    authLog('[LeetFeedback Extension] Received message:', message);
 
     switch (message.type) {
       case 'AUTH_STATUS_REQUEST':
@@ -34,7 +62,7 @@
         return true;
 
       default:
-        console.log('[LeetFeedback Extension] Unknown message type:', message.type);
+        authLog('[LeetFeedback Extension] Unknown message type:', message.type);
         break;
     }
   });
@@ -42,14 +70,14 @@
   // Handle auth status request from extension
   function handleAuthStatusRequest(sendResponse) {
     try {
-      console.log('[LeetFeedback Extension] Handling auth status request');
+      authLog('[LeetFeedback Extension] Handling auth status request');
       
       // First check localStorage for immediate response
       const cachedUser = localStorage.getItem('firebase_user');
       if (cachedUser) {
         try {
           const userData = JSON.parse(cachedUser);
-          console.log('[LeetFeedback Extension] Found cached user data');
+          authLog('[LeetFeedback Extension] Found cached user data');
           sendResponse({
             type: 'AUTH_STATUS_RESPONSE',
             isAuthenticated: true,
@@ -57,7 +85,7 @@
           });
           return;
         } catch (e) {
-          console.log('[LeetFeedback Extension] Invalid cached user data');
+          authLog('[LeetFeedback Extension] Invalid cached user data');
         }
       }
 
@@ -72,7 +100,7 @@
         if (event.origin !== window.location.origin) return;
         
         if (event.data.type === 'AUTH_STATUS_RESPONSE' && event.data.source !== 'extension') {
-          console.log('[LeetFeedback Extension] Received auth response from website:', event.data);
+          authLog('[LeetFeedback Extension] Received auth response from website:', event.data);
           window.removeEventListener('message', authResponseHandler);
           sendResponse({
             type: 'AUTH_STATUS_RESPONSE',
@@ -87,7 +115,7 @@
       // Timeout after 3 seconds
       setTimeout(() => {
         window.removeEventListener('message', authResponseHandler);
-        console.log('[LeetFeedback Extension] Auth request timeout, sending no auth response');
+        authLog('[LeetFeedback Extension] Auth request timeout, sending no auth response');
         sendResponse({
           type: 'AUTH_STATUS_RESPONSE',
           isAuthenticated: false,
@@ -97,7 +125,7 @@
       }, 3000);
 
     } catch (error) {
-      console.error('[LeetFeedback Extension] Error handling auth status request:', error);
+      authError('[LeetFeedback Extension] Error handling auth status request:', error);
       sendResponse({
         type: 'AUTH_STATUS_RESPONSE',
         isAuthenticated: false,
@@ -142,7 +170,7 @@
       }, 3000);
 
     } catch (error) {
-      console.error('[LeetFeedback Extension] Error handling sign out request:', error);
+      authError('[LeetFeedback Extension] Error handling sign out request:', error);
       sendResponse({
         type: 'SIGN_OUT_RESPONSE',
         success: false,
@@ -156,7 +184,7 @@
     if (event.origin !== window.location.origin) return;
     
     if (event.data.type === 'AUTH_STATE_CHANGED' && event.data.source !== 'extension') {
-      console.log('[LeetFeedback Extension] Auth state changed:', event.data);
+      authLog('[LeetFeedback Extension] Auth state changed:', event.data);
       
       // Forward auth state change to extension background script
       chrome.runtime.sendMessage({
@@ -164,7 +192,7 @@
         isAuthenticated: event.data.isAuthenticated,
         user: event.data.user
       }).catch(error => {
-        console.error('[LeetFeedback Extension] Error forwarding auth state change:', error);
+        authError('[LeetFeedback Extension] Error forwarding auth state change:', error);
       });
     }
   });
@@ -175,7 +203,7 @@
     if (cachedUser) {
       try {
         const userData = JSON.parse(cachedUser);
-        console.log('[LeetFeedback Extension] Found existing auth data, forwarding to extension');
+        authLog('[LeetFeedback Extension] Found existing auth data, forwarding to extension');
         chrome.runtime.sendMessage({
           type: 'AUTH_STATE_CHANGED',
           isAuthenticated: true,
@@ -184,11 +212,11 @@
           // Ignore if extension context is invalid
         });
       } catch (e) {
-        console.error('[LeetFeedback Extension] Error parsing cached user data:', e);
+        authError('[LeetFeedback Extension] Error parsing cached user data:', e);
       }
     }
   }, 1000);
 
   // Initialize communication
-  console.log('[LeetFeedback Extension] Website-extension communication initialized');
+  authLog('[LeetFeedback Extension] Website-extension communication initialized');
 })();

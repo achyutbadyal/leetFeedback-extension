@@ -58,7 +58,7 @@
         }
 
         DSAUtils.logDebug(PLATFORM, 'TakeUforward extractor initialized');
-        console.log('[TakeUforward] Extension fully initialized');
+        debugLog('[TakeUforward] Extension fully initialized');
         isInitialized = true;
       } catch (error) {
         DSAUtils.logError(PLATFORM, 'Failed to initialize', error);
@@ -116,7 +116,7 @@
         // CODE_SUBMIT: Capture code when user submits
         if (event.data.type === 'CODE_SUBMIT') {
           const submitData = event.data.payload;
-          console.log('[TakeUforward] Captured code submission:', submitData);
+          debugLog('[TakeUforward] Captured code submission:', submitData);
 
           SELECTED_LANGUAGE = submitData.language || '';
           PUBLIC_CODE = submitData.usercode || '';
@@ -132,20 +132,20 @@
             }
           });
 
-          console.log('[TakeUforward] Stored code data:', {
+          debugLog('[TakeUforward] Stored code data:', {
             language: SELECTED_LANGUAGE,
             codeLength: PUBLIC_CODE.length,
             problemSlug: PROBLEM_SLUG
           });
 
           TRIES++;
-          console.log('[TakeUforward] Tries now:', TRIES);
+          debugLog('[TakeUforward] Tries now:', TRIES);
         }
 
         // CODE_RUN: Track run attempts and capture code
         else if (event.data.type === 'CODE_RUN') {
           this.runCounter++;
-          console.log(`[TakeUforward] Run button clicked - attempt #${this.runCounter}`);
+          debugLog(`[TakeUforward] Run button clicked - attempt #${this.runCounter}`);
 
           // Capture the code at this run attempt
           const runData = event.data.payload || {};
@@ -162,26 +162,26 @@
               successful: null // Will be determined by RUN_RESPONSE
             };
             this.attempts.push(attempt);
-            console.log(`[TakeUforward] Stored run attempt #${this.runCounter}`);
+            debugLog(`[TakeUforward] Stored run attempt #${this.runCounter}`);
           }
         }
 
         // RUN_RESPONSE: Track run results (success/failure)
         else if (event.data.type === 'RUN_RESPONSE') {
           const runResult = event.data.payload;
-          console.log('[TakeUforward] Run response received:', runResult);
+          debugLog('[TakeUforward] Run response received:', runResult);
 
           // Find the most recent run attempt and mark it
           const lastAttempt = this.attempts.filter(a => a.type === 'run').pop();
           if (lastAttempt && lastAttempt.successful === null) {
             if (runResult.success === true || runResult.status === 'Accepted') {
               lastAttempt.successful = true;
-              console.log(`[TakeUforward] Run #${lastAttempt.runNumber} - SUCCESS`);
+              debugLog(`[TakeUforward] Run #${lastAttempt.runNumber} - SUCCESS`);
             } else {
               lastAttempt.successful = false;
               this.incorrectRunCounter++;
-              console.log(`[TakeUforward] Run #${lastAttempt.runNumber} - FAILED`);
-              console.log(`[TakeUforward] Total failed runs: ${this.incorrectRunCounter}/3`);
+              debugLog(`[TakeUforward] Run #${lastAttempt.runNumber} - FAILED`);
+              debugLog(`[TakeUforward] Total failed runs: ${this.incorrectRunCounter}/3`);
 
               // Check if we've reached 3 failed runs
               if (this.incorrectRunCounter >= 2 && !this.hasAnalyzedMistakes) {
@@ -194,16 +194,16 @@
         // SUBMISSION_RESPONSE: Handle submission results
         else if (event.data.type === 'SUBMISSION_RESPONSE') {
           const submissionData = event.data.payload;
-          console.log('[TakeUforward] Received submission response:', submissionData);
+          debugLog('[TakeUforward] Received submission response:', submissionData);
 
           if (submissionData.success === true) {
-            console.log('[TakeUforward] Submission successful! Processing...');
+            debugLog('[TakeUforward] Submission successful! Processing...');
             await this.handleSuccessfulSubmission(submissionData);
           } else {
-            console.log('[TakeUforward] Submission was not successful. Status:', submissionData.status);
+            debugLog('[TakeUforward] Submission was not successful. Status:', submissionData.status);
             // Count failed submissions as failed runs too
             this.incorrectRunCounter++;
-            console.log(`[TakeUforward] Total failed attempts: ${this.incorrectRunCounter}/3`);
+            debugLog(`[TakeUforward] Total failed attempts: ${this.incorrectRunCounter}/3`);
 
             if (this.incorrectRunCounter >= 3 && !this.hasAnalyzedMistakes) {
               this.handleThreeIncorrectRuns();
@@ -228,11 +228,11 @@
 
     pollForQuestionDetails() {
       const pollInterval = setInterval(() => {
-        console.log('[TakeUforward] Polling for question details...');
+        debugLog('[TakeUforward] Polling for question details...');
         this.fetchQuestionDetails();
 
         if (QUES && DESCRIPTION) {
-          console.log('[TakeUforward] Question details found, stopping poll');
+          debugLog('[TakeUforward] Question details found, stopping poll');
           clearInterval(pollInterval);
         }
       }, 1000);
@@ -251,7 +251,7 @@
     }
 
     fetchQuestionDetails() {
-      console.log('📖 [TakeUforward] Fetching question details...');
+      debugLog('📖 [TakeUforward] Fetching question details...');
 
       const headingElem = document.querySelector('h1.text-xl.font-bold');
       const paragraphElem = document.querySelector('.tuf-text-14');
@@ -259,9 +259,9 @@
       if (headingElem && paragraphElem) {
         QUES = headingElem.textContent?.trim() || "";
         DESCRIPTION = paragraphElem.textContent?.trim() || "";
-        console.log('[TakeUforward] Question details fetched:', QUES);
+        debugLog('[TakeUforward] Question details fetched:', QUES);
       } else {
-        console.log('[TakeUforward] Question elements not found:', {
+        debugLog('[TakeUforward] Question elements not found:', {
           hasHeading: !!headingElem,
           hasParagraph: !!paragraphElem
         });
@@ -270,7 +270,7 @@
       // Extract difficulty
       const difficultyElement = document.querySelector('[class*="difficulty"], [class*="Difficulty"]');
       DIFFICULTY = difficultyElement?.textContent?.trim() || "Medium";
-      console.log('[TakeUforward] Extracted difficulty:', DIFFICULTY);
+      debugLog('[TakeUforward] Extracted difficulty:', DIFFICULTY);
     }
 
     async extractProblemInfo() {
@@ -280,7 +280,7 @@
 
         // Try to get stored code data if not in memory
         if (!PUBLIC_CODE || !SELECTED_LANGUAGE || !PROBLEM_SLUG) {
-          console.log('[TakeUforward] Code data missing in memory, checking storage...');
+          debugLog('[TakeUforward] Code data missing in memory, checking storage...');
           const storedData = await chrome.storage.local.get(['tuf_code_data']);
 
           if (storedData.tuf_code_data && storedData.tuf_code_data.timestamp) {
@@ -289,7 +289,7 @@
               SELECTED_LANGUAGE = storedData.tuf_code_data.SELECTED_LANGUAGE || SELECTED_LANGUAGE;
               PUBLIC_CODE = storedData.tuf_code_data.PUBLIC_CODE || PUBLIC_CODE;
               PROBLEM_SLUG = storedData.tuf_code_data.PROBLEM_SLUG || PROBLEM_SLUG;
-              console.log('[TakeUforward] Retrieved code data from storage (age:', Math.round(dataAge / 1000), 'seconds)');
+              debugLog('[TakeUforward] Retrieved code data from storage (age:', Math.round(dataAge / 1000), 'seconds)');
             }
           }
         }
@@ -414,25 +414,25 @@
         };
 
         await chrome.storage.local.set({ [storageKey]: problemData });
-        console.log('[TakeUforward] Saved problem data for:', currentUrl);
+        debugLog('[TakeUforward] Saved problem data for:', currentUrl);
 
         return problemData;
       } catch (error) {
-        console.error('[TakeUforward] Error saving problem data:', error);
+        debugError('[TakeUforward] Error saving problem data:', error);
         return null;
       }
     }
 
     async handleThreeIncorrectRuns() {
       // Just set flag - Gemini analysis will run on successful submit before backend push
-      console.log(`[TakeUforward] 3 failed runs detected - flagging for Gemini analysis on submit`);
+      debugLog(`[TakeUforward] 3 failed runs detected - flagging for Gemini analysis on submit`);
       this.hasAnalyzedMistakes = true;
       this.shouldAnalyzeWithGemini = true;
     }
 
     async handleSuccessfulSubmission(submissionData) {
       try {
-        console.log('[TakeUforward] SUCCESSFUL SUBMISSION DETECTED');
+        debugLog('[TakeUforward] SUCCESSFUL SUBMISSION DETECTED');
 
         // Wait a bit for UI to update
         await DSAUtils.sleep(2000);
@@ -441,13 +441,13 @@
         const problemInfo = await this.extractProblemInfo();
 
         if (!problemInfo) {
-          console.error('[TakeUforward] Could not extract problem information');
+          debugError('[TakeUforward] Could not extract problem information');
           return;
         }
 
         // Validate we have code
         if (!problemInfo.code || problemInfo.code.length < 10) {
-          console.error('[TakeUforward] Missing or invalid code. Code length:', problemInfo.code?.length);
+          debugError('[TakeUforward] Missing or invalid code. Code length:', problemInfo.code?.length);
           return;
         }
 
@@ -461,7 +461,7 @@
           memory: submissionData.averageMemory
         };
 
-        console.log('[TakeUforward] Problem info ready for push:', {
+        debugLog('[TakeUforward] Problem info ready for push:', {
           title: problemInfo.title,
           difficulty: problemInfo.difficulty,
           codeLength: problemInfo.code.length,
@@ -471,11 +471,11 @@
 
         // Store problem as solved BEFORE pushing to backend
         await this.storeProblemData(problemInfo, true);
-        console.log('[TakeUforward] Stored problem as solved');
+        debugLog('[TakeUforward] Stored problem as solved');
 
         // Step 0: Run Gemini analysis if flagged (before backend push)
         if (this.shouldAnalyzeWithGemini) {
-          console.log(`[TakeUforward] Step 0: Running Gemini analysis before backend push...`);
+          debugLog(`[TakeUforward] Step 0: Running Gemini analysis before backend push...`);
           try {
             const geminiAPI = new GeminiAPI();
             const geminiConfigured = await geminiAPI.initialize();
@@ -483,34 +483,34 @@
             if (geminiConfigured) {
               // Send ALL attempts (not just failed) to Gemini for full context
               const allAttempts = this.attempts.filter(a => a.code && a.code.length > 10);
-              console.log(`[TakeUforward] Sending ${allAttempts.length} code iterations to Gemini`);
+              debugLog(`[TakeUforward] Sending ${allAttempts.length} code iterations to Gemini`);
 
               const geminiResult = await geminiAPI.analyzeMistakes(allAttempts, problemInfo);
 
               if (geminiResult.success) {
                 this.aiAnalysis = geminiResult.analysis;
                 this.aiTags = geminiResult.tags || [];
-                console.log(`[TakeUforward] Gemini analysis complete. Tags: ${this.aiTags.join(', ')}`);
+                debugLog(`[TakeUforward] Gemini analysis complete. Tags: ${this.aiTags.join(', ')}`);
 
                 // Update stored problem data with AI analysis
                 await this.storeProblemData(problemInfo, true);
               } else {
-                console.log(`[TakeUforward] Gemini analysis failed: ${geminiResult.error}`);
+                debugLog(`[TakeUforward] Gemini analysis failed: ${geminiResult.error}`);
               }
             } else {
-              console.log(`[TakeUforward] Gemini API key not configured - skipping analysis`);
+              debugLog(`[TakeUforward] Gemini API key not configured - skipping analysis`);
             }
           } catch (error) {
-            console.error(`[TakeUforward] Gemini analysis error:`, error);
+            debugError(`[TakeUforward] Gemini analysis error:`, error);
             // Continue with submission even if Gemini fails
           }
         }
 
         // Step 1: Push to Backend API
-        console.log('[TakeUforward] Step 1: Pushing to backend...');
+        debugLog('[TakeUforward] Step 1: Pushing to backend...');
         try {
           if (!backendAPI) {
-            console.log('[TakeUforward] Initializing BackendAPI...');
+            debugLog('[TakeUforward] Initializing BackendAPI...');
             backendAPI = new BackendAPI();
             await backendAPI.initialize();
           }
@@ -518,21 +518,21 @@
           const backendResult = await backendAPI.pushCurrentProblemData(problemInfo.url);
 
           if (backendResult.success) {
-            console.log('[TakeUforward] Backend push successful!', backendResult.data);
+            debugLog('[TakeUforward] Backend push successful!', backendResult.data);
             // Show success toast
             if (window.LeetFeedbackToast) {
               const message = backendResult.data?.message || 'Solution synced to Traverse!';
               window.LeetFeedbackToast.success(message);
             }
           } else {
-            console.log('[TakeUforward] Backend push failed:', backendResult.error);
+            debugLog('[TakeUforward] Backend push failed:', backendResult.error);
             // Show error toast
             if (window.LeetFeedbackToast) {
               window.LeetFeedbackToast.error(`Sync failed: ${backendResult.error}`);
             }
           }
         } catch (error) {
-          console.error('[TakeUforward] Backend push error:', error);
+          debugError('[TakeUforward] Backend push error:', error);
           // Show error toast
           if (window.LeetFeedbackToast) {
             window.LeetFeedbackToast.error(`Sync error: ${error.message}`);
@@ -545,11 +545,11 @@
 
         if (githubPushEnabled) {
           // Step 2: Push to GitHub
-          console.log('[TakeUforward] Step 2: Pushing to GitHub...');
+          debugLog('[TakeUforward] Step 2: Pushing to GitHub...');
           const githubResult = await githubAPI.pushSolution(problemInfo, PLATFORM);
 
           if (githubResult.success) {
-            console.log('[TakeUforward] GitHub push successful!');
+            debugLog('[TakeUforward] GitHub push successful!');
 
             // Clear stored code data after successful push
             await chrome.storage.local.remove(['tuf_code_data']);
@@ -567,10 +567,10 @@
             this.aiAnalysis = null;
             this.aiTags = [];
           } else {
-            console.error('[TakeUforward] GitHub push failed:', githubResult.error);
+            debugError('[TakeUforward] GitHub push failed:', githubResult.error);
           }
         } else {
-          console.log('[TakeUforward] GitHub push disabled by user - skipping');
+          debugLog('[TakeUforward] GitHub push disabled by user - skipping');
           // Still reset state
           TRIES = 0;
           PUBLIC_CODE = '';
@@ -591,11 +591,18 @@
     }
 
     injectInterceptor() {
+      // First inject the debug flag so the interceptor knows whether to log
+      const debugFlagScript = document.createElement('script');
+      debugFlagScript.textContent = `window.__TUF_DEBUG__ = ${isDebugMode()};`;
+      (document.head || document.documentElement).appendChild(debugFlagScript);
+      debugFlagScript.remove();
+      
+      // Then inject the actual interceptor
       const script = document.createElement('script');
       script.src = chrome.runtime.getURL('utils/interceptor.js');
       (document.head || document.documentElement).appendChild(script);
       script.onload = () => {
-        console.log('[TakeUforward] Interceptor script injected');
+        debugLog('[TakeUforward] Interceptor script injected');
         script.remove();
       };
     }
@@ -611,12 +618,12 @@
   async function initializeTakeUforward() {
     // Wait for required utilities to be available
     if (typeof DSAUtils === 'undefined' || typeof GitHubAPI === 'undefined' || typeof BackendAPI === 'undefined') {
-      console.log('[TakeUforward] Waiting for utilities...');
+      debugLog('[TakeUforward] Waiting for utilities...');
       setTimeout(initializeTakeUforward, 500);
       return;
     }
 
-    console.log('[TakeUforward] Starting initialization...');
+    debugLog('[TakeUforward] Starting initialization...');
     const extractor = new TakeUforwardExtractor();
     await extractor.initialize();
   }
