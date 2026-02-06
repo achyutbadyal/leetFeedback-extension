@@ -138,10 +138,10 @@ Use ONLY these specific tag categories (pick 1-3 most relevant):
 - Off By One
 
 Then provide brief analysis:
-1. **Key Issues**: What specific errors occurred
-2. **Evolution**: How attempts improved
-
-Keep under 80 words total. Focus only on technical programming concepts.`;
+1. **Time-Travel Debugging**: From all of them attempts choose the most clicking moments/code snippets, which even when user sees even after a long time, they should remember how he solved this problem.
+2. **Key Issues**: What specific errors occurred. 
+3. **Improvements**: As attemps progressed, what improved.
+Keep under 100 words total. Focus only on technical programming concepts.`;
 
         return prompt;
     }
