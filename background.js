@@ -58,6 +58,27 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+// Track browser session for timer reset
+chrome.runtime.onStartup.addListener(() => {
+  bgLog("Browser started - marking session restart");
+  // Set a flag that indicates browser was restarted
+  chrome.storage.local.set({ 
+    browser_session_restarted: true,
+    session_start_time: Date.now()
+  });
+});
+
+// Also handle extension restart (when extension is reloaded)
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'install' || details.reason === 'update') {
+    bgLog("Extension installed/updated - marking session restart");
+    chrome.storage.local.set({ 
+      browser_session_restarted: true,
+      session_start_time: Date.now()
+    });
+  }
+});
+
 // Handle messages from content scripts and sidepanel
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   bgLog("Message received:", request.type);

@@ -591,20 +591,18 @@
     }
 
     injectInterceptor() {
-      // First inject the debug flag so the interceptor knows whether to log
-      const debugFlagScript = document.createElement('script');
-      debugFlagScript.textContent = `window.__TUF_DEBUG__ = ${isDebugMode()};`;
-      (document.head || document.documentElement).appendChild(debugFlagScript);
-      debugFlagScript.remove();
+      // Store debug flag in a way that doesn't violate CSP
+      // We'll pass it through a data attribute or storage instead
+      chrome.storage.local.set({ 'tuf_debug_mode': isDebugMode() });
       
-      // Then inject the actual interceptor
+      // Inject the actual interceptor
       const script = document.createElement('script');
       script.src = chrome.runtime.getURL('utils/interceptor.js');
       (document.head || document.documentElement).appendChild(script);
-      script.onload = () => {
+      script.addEventListener('load', () => {
         debugLog('[TakeUforward] Interceptor script injected');
         script.remove();
-      };
+      });
     }
   }
 

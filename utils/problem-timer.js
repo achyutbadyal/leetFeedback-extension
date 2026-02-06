@@ -135,21 +135,21 @@ class ProblemTimer {
         if (!this.startTime) return 0;
 
         const now = Date.now();
-        const elapsed = now - this.startTime - this.pausedTime;
+        let elapsed = now - this.startTime - this.pausedTime;
 
-        // Ensure elapsed time is always positive and reasonable
-        // If calculation results in negative or unreasonably large value, 
-        // it indicates corrupt state - return 0 to prevent display issues
-        if (elapsed < 0) {
-            console.warn('[ProblemTimer] Negative elapsed time detected, resetting calculation');
-            return 0;
+        // If currently hidden, don't count the current hidden duration
+        if (this.isTabHidden && this.tabHiddenAt) {
+            const currentHiddenDuration = now - this.tabHiddenAt;
+            elapsed -= currentHiddenDuration;
         }
 
-        // Cap at 24 hours (86400000ms) to prevent overflow issues
-        const MAX_TIME = 24 * 60 * 60 * 1000;
-        if (elapsed > MAX_TIME) {
-            console.warn('[ProblemTimer] Elapsed time exceeds 24h, capping');
-            return MAX_TIME;
+        // Ensure elapsed time is always positive
+        if (elapsed < 0) {
+            console.warn('[ProblemTimer] Negative elapsed time detected, resetting timer');
+            this.startTime = now;
+            this.pausedTime = 0;
+            this.tabHiddenAt = null;
+            return 0;
         }
 
         return elapsed;
@@ -185,6 +185,17 @@ class ProblemTimer {
         if (!this.problemUrl) return;
 
         try {
+            // Check if browser was restarted
+            const sessionResult = await chrome.storage.local.get(['browser_session_restarted', 'session_start_time']);
+            
+            if (sessionResult.browser_session_restarted) {
+                console.log('[ProblemTimer] Browser session restarted - resetting timer');
+                // Clear the restart flag
+                await chrome.storage.local.remove(['browser_session_restarted']);
+                // Don't load old timer data, start fresh
+                return;
+            }
+
             const storageKey = `problem_data_${this.problemUrl}`;
             const result = await chrome.storage.local.get([storageKey]);
             const problemData = result[storageKey];
@@ -300,20 +311,22 @@ class ProblemTimer {
     `;
         closeBtn.textContent = '×';
         closeBtn.title = 'Hide timer (re-enable in extension settings)';
-        closeBtn.onmouseover = () => {
+        
+        // Add event listeners instead of inline handlers
+        closeBtn.addEventListener('mouseover', () => {
             closeBtn.style.background = 'rgba(255, 255, 255, 0.2)';
             closeBtn.style.color = 'white';
-        };
-        closeBtn.onmouseout = () => {
+        });
+        closeBtn.addEventListener('mouseout', () => {
             closeBtn.style.background = 'rgba(255, 255, 255, 0.1)';
             closeBtn.style.color = 'rgba(255, 255, 255, 0.6)';
-        };
-        closeBtn.onclick = (e) => {
+        });
+        closeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.hideOverlay();
             // Disable in settings
             chrome.storage.sync.set({ timer_overlay_enabled: false });
-        };
+        });
 
         // Reset button
         const resetBtn = document.createElement('button');
@@ -333,33 +346,35 @@ class ProblemTimer {
     `;
         resetBtn.textContent = '↺';
         resetBtn.title = 'Reset timer';
-        resetBtn.onmouseover = () => {
+        
+        // Add event listeners instead of inline handlers
+        resetBtn.addEventListener('mouseover', () => {
             resetBtn.style.background = 'rgba(255, 255, 255, 0.2)';
             resetBtn.style.color = 'white';
-        };
-        resetBtn.onmouseout = () => {
+        });
+        resetBtn.addEventListener('mouseout', () => {
             resetBtn.style.background = 'rgba(255, 255, 255, 0.1)';
             resetBtn.style.color = 'rgba(255, 255, 255, 0.6)';
-        };
-        resetBtn.onclick = (e) => {
+        });
+        resetBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.resetTimer();
-        };
+        });
 
         this.overlay.appendChild(icon);
         this.overlay.appendChild(timeDisplay);
         this.overlay.appendChild(resetBtn);
         this.overlay.appendChild(closeBtn);
 
-        // Hover effects
-        this.overlay.onmouseover = () => {
+        // Hover effects using event listeners instead of inline handlers
+        this.overlay.addEventListener('mouseover', () => {
             this.overlay.style.opacity = '1';
             this.overlay.style.transform = 'scale(1.02)';
-        };
-        this.overlay.onmouseout = () => {
+        });
+        this.overlay.addEventListener('mouseout', () => {
             this.overlay.style.opacity = '0.6';
             this.overlay.style.transform = 'scale(1)';
-        };
+        });
 
         document.body.appendChild(this.overlay);
     }

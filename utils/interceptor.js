@@ -3,8 +3,16 @@
 (function () {
   'use strict';
 
-  // Debug mode is controlled via window.__TUF_DEBUG__ set by content script before injection
-  const DEBUG_MODE = window.__TUF_DEBUG__ || false;
+  // Debug mode will be loaded from storage
+  let DEBUG_MODE = false;
+  
+  // Load debug mode from storage
+  if (typeof chrome !== 'undefined' && chrome.storage) {
+    chrome.storage.local.get(['tuf_debug_mode'], (result) => {
+      DEBUG_MODE = result.tuf_debug_mode || false;
+      log('[TUF Interceptor] Debug mode loaded:', DEBUG_MODE);
+    });
+  }
   
   function log(...args) {
     if (DEBUG_MODE) console.log(...args);
