@@ -1012,6 +1012,13 @@
         debugLog(`[LeetCode Submission] Step 1: Pushing to backend...`);
         debugLog(`[LeetCode Debug] BackendAPI available:`, typeof BackendAPI !== 'undefined');
         debugLog(`[LeetCode Debug] backendAPI instance:`, backendAPI);
+        
+        // Show immediate feedback that push is starting
+        let pushingToast = null;
+        if (window.LeetFeedbackToast) {
+          pushingToast = window.LeetFeedbackToast.info('Syncing to Traverse...', 0); // 0 = no auto-dismiss
+        }
+        
         try {
           if (!backendAPI) {
             debugLog(`[LeetCode Submission] Initializing BackendAPI...`);
@@ -1024,6 +1031,11 @@
           debugLog(`[LeetCode Submission] Current problem URL: ${currentUrl}`);
 
           const backendResult = await backendAPI.pushCurrentProblemData(currentUrl);
+
+          // Dismiss the "syncing" toast
+          if (pushingToast && window.LeetFeedbackToast) {
+            window.LeetFeedbackToast.dismiss(pushingToast);
+          }
 
           if (backendResult.success) {
             debugLog(`[LeetCode Submission] Backend push successful!`, backendResult.data);
@@ -1042,6 +1054,10 @@
           }
         } catch (error) {
           debugError(`[LeetCode Submission] Backend push error:`, error);
+          // Dismiss the "syncing" toast
+          if (pushingToast && window.LeetFeedbackToast) {
+            window.LeetFeedbackToast.dismiss(pushingToast);
+          }
           // Show error toast
           if (window.LeetFeedbackToast) {
             window.LeetFeedbackToast.error(`Sync error: ${error.message}`);

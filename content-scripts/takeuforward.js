@@ -508,6 +508,13 @@
 
         // Step 1: Push to Backend API
         debugLog('[TakeUforward] Step 1: Pushing to backend...');
+        
+        // Show immediate feedback that push is starting
+        let pushingToast = null;
+        if (window.LeetFeedbackToast) {
+          pushingToast = window.LeetFeedbackToast.info('Syncing to Traverse...', 0); // 0 = no auto-dismiss
+        }
+        
         try {
           if (!backendAPI) {
             debugLog('[TakeUforward] Initializing BackendAPI...');
@@ -516,6 +523,11 @@
           }
 
           const backendResult = await backendAPI.pushCurrentProblemData(problemInfo.url);
+
+          // Dismiss the "syncing" toast
+          if (pushingToast && window.LeetFeedbackToast) {
+            window.LeetFeedbackToast.dismiss(pushingToast);
+          }
 
           if (backendResult.success) {
             debugLog('[TakeUforward] Backend push successful!', backendResult.data);
@@ -533,6 +545,10 @@
           }
         } catch (error) {
           debugError('[TakeUforward] Backend push error:', error);
+          // Dismiss the "syncing" toast
+          if (pushingToast && window.LeetFeedbackToast) {
+            window.LeetFeedbackToast.dismiss(pushingToast);
+          }
           // Show error toast
           if (window.LeetFeedbackToast) {
             window.LeetFeedbackToast.error(`Sync error: ${error.message}`);

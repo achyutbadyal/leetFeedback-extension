@@ -439,27 +439,4 @@ async function handleInitializeConfig(request, sender, sendResponse) {
   }
 }
 
-// Handle backend API fetch (to bypass CORS from content scripts)
-async function handleBackendAPIFetch(request, sender, sendResponse) {
-  try {
-    const { url, options } = request;
-    bgLog(`[Background] Making backend API request to: ${url}`);
-
-    const response = await fetch(url, options);
-    const data = await response.json();
-
-    sendResponse({
-      success: response.ok,
-      status: response.status,
-      data: data
-    });
-  } catch (error) {
-    bgError('[Background] Backend API fetch error:', error);
-    sendResponse({
-      success: false,
-      error: error.message
-    });
-  }
-}
-
 bgLog("Background script loaded successfully");
