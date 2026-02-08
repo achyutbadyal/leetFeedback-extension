@@ -76,17 +76,6 @@
                 "content-scripts/takeuforward.js"
             ],
             "run_at": "document_end"
-        },
-        {
-            "matches": [
-                "https://leet-feedback.vercel.app/*",
-                "https://*.vercel.app/*",
-                "https://*.netlify.app/*"
-            ],
-            "js": [
-                "content-scripts/website-auth.js"
-            ],
-            "run_at": "document_end"
         }
     ],
     "action": {

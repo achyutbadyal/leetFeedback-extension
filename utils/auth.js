@@ -57,21 +57,11 @@ class ExtensionAuth {
         'auth_user',
         'auth_token',
         'auth_timestamp',
-        'firebase_user',
       ]);
 
-      const hasNewSession = Boolean(data.auth_user && data.auth_token);
-      if (hasNewSession) {
+      const hasSession = Boolean(data.auth_user && data.auth_token);
+      if (hasSession) {
         await this.updateAuthStatus(true, data.auth_user, data.auth_token, {
-          persist: false,
-          silent: true,
-        });
-        return;
-      }
-
-      const hasLegacySession = Boolean(data.firebase_user);
-      if (hasLegacySession) {
-        await this.updateAuthStatus(true, data.firebase_user, data.auth_token || null, {
           persist: false,
           silent: true,
         });
@@ -214,7 +204,9 @@ class ExtensionAuth {
       };
 
     if (!token) {
-      authDbgWarn('[ExtensionAuth] Login succeeded but token missing from response.');
+      authDbgWarn('[ExtensionAuth] Login succeeded but no token in response. Response keys:', Object.keys(data));
+    } else {
+      authDbgLog('[ExtensionAuth] Token received from login');
     }
 
     await this.updateAuthStatus(true, user, token || null);
@@ -240,11 +232,13 @@ class ExtensionAuth {
 
     if (user) {
       payload.auth_user = user;
-      payload.firebase_user = user;
     }
 
     if (token) {
       payload.auth_token = token;
+      authDbgLog('[ExtensionAuth] Storing token in chrome.storage.local');
+    } else {
+      authDbgWarn('[ExtensionAuth] Attempting to store session without token');
     }
 
     await chrome.storage.local.set(payload);
@@ -257,7 +251,6 @@ class ExtensionAuth {
       'auth_user',
       'auth_token',
       'auth_timestamp',
-      'firebase_user',
     ]);
   }
 

@@ -518,18 +518,6 @@ class PopupController {
         this.updateAuthSection();
       }
 
-      // Listen for auth updates from background script
-      chrome.runtime.onMessage.addListener((message) => {
-        if (message.type === "AUTH_UPDATE") {
-          spLog("[Popup] Received auth update from background:", message);
-          this.authStatus = {
-            isAuthenticated: message.isAuthenticated,
-            user: message.user,
-            token: this.authStatus.token || null,
-          };
-          this.updateAuthSection();
-        }
-      });
     } catch (error) {
       spError("Error initializing auth:", error);
     }

@@ -91,27 +91,28 @@ class BackendAPI {
   async initialize() {
     try {
       // Get authentication token from chrome storage
-      const result = await chrome.storage.local.get(['auth_token']);
+      const result = await chrome.storage.local.get(['auth_token', 'auth_user']);
       this.authToken = result.auth_token;
       this.initialized = true;
 
-      this._log('[Backend API] Raw token from storage:', this.authToken);
-      this._log('[Backend API] Token type:', typeof this.authToken);
-      this._log('[Backend API] Token starts with Bearer?', this.authToken ? this.authToken.startsWith('Bearer ') : false);
+      this._log('[Backend API] Initialization attempt');
+      this._log('[Backend API] Token found:', !!this.authToken);
+      this._log('[Backend API] User found:', !!result.auth_user);
 
       if (!this.authToken) {
-        this._warn('[Backend API] No authentication token found');
-        // Let's also check all auth-related storage keys
+        this._warn('[Backend API] No authentication token found in storage');
+        
+        // Debug: Check all storage keys
         const allAuthData = await chrome.storage.local.get(null);
-        const authKeys = Object.keys(allAuthData).filter(key => key.includes('auth') || key.includes('token'));
+        const authKeys = Object.keys(allAuthData).filter(key => 
+          key.includes('auth') || key.includes('token') || key.includes('user')
+        );
         this._log('[Backend API] Available auth-related keys:', authKeys);
-        authKeys.forEach(key => {
-          this._log(`[Backend API] ${key}:`, allAuthData[key]);
-        });
+        
         return false;
       }
 
-      this._log('[Backend API] Initialized successfully');
+      this._log('[Backend API] Initialized successfully with token');
       return true;
     } catch (error) {
       this._error('[Backend API] Error during initialization:', error);
@@ -151,19 +152,18 @@ class BackendAPI {
   async pushSubmissionData(problemData) {
     try {
       if (!this.initialized) {
+        this._log('[Backend API] Not initialized, initializing now...');
         const initialized = await this.initialize();
         if (!initialized) {
-          throw new Error('Backend API not initialized or no authentication token');
+          throw new Error('Failed to initialize: No authentication token found. Please log in to the extension.');
         }
       }
 
       if (!this.authToken) {
-        throw new Error('No authentication token available');
+        throw new Error('No authentication token available. Please log in to the extension.');
       }
 
-      this._log('[Backend API] Pushing submission data:', problemData);
-      this._log('[Backend API] Raw auth token:', this.authToken);
-      this._log('[Backend API] Token length:', this.authToken ? this.authToken.length : 0);
+      this._log('[Backend API] Pushing submission data');
 
       // Use background script to make the fetch call (bypasses CORS)
       const response = await new Promise((resolve, reject) => {
@@ -174,9 +174,8 @@ class BackendAPI {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Cookie': `auth_token=${this.authToken}`
+              'Authorization': `Bearer ${this.authToken}`
             },
-            credentials: 'include',
             body: JSON.stringify(problemData)
           }
         }, (response) => {
@@ -191,7 +190,6 @@ class BackendAPI {
       });
 
       if (!response.success) {
-        // Handle both HTTP errors (with status/data) and fetch errors (with error property)
         const errorStatus = response.status || 'unknown';
         const errorDetails = response.error || response.data || 'No details available';
         this._error('[Backend API] Push failed:', errorStatus, errorDetails);
