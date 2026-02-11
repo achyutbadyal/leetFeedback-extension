@@ -282,11 +282,6 @@ class ProblemTimer {
         problemData.pausedTime = this.pausedTime;
 
         await chrome.storage.local.set({ [storageKey]: problemData });
-
-        // Save overlay position
-        await chrome.storage.local.set({
-          timer_overlay_position: { x: this.currentX, y: this.currentY },
-        });
       } catch (error) {
         console.error("[ProblemTimer] Error saving to storage:", error);
       }
@@ -294,6 +289,17 @@ class ProblemTimer {
 
     // Wait for this save operation to complete
     await this._saveQueue;
+  }
+
+  // Save overlay position to storage (only when position changes)
+  async saveOverlayPosition() {
+    try {
+      await chrome.storage.local.set({
+        timer_overlay_position: { x: this.currentX, y: this.currentY },
+      });
+    } catch (error) {
+      console.error("[ProblemTimer] Error saving overlay position:", error);
+    }
   }
 
   // ========== OVERLAY METHODS ==========
@@ -504,7 +510,7 @@ class ProblemTimer {
       document.removeEventListener("mouseup", handleMouseUp);
 
       // Save new position
-      await this.saveToStorage();
+      await this.saveOverlayPosition();
     };
 
     this.overlay.addEventListener("mousedown", handleMouseDown);
@@ -528,7 +534,7 @@ class ProblemTimer {
       this.currentY = newY;
       this.overlay.style.left = `${newX}px`;
       this.overlay.style.top = `${newY}px`;
-      this.saveToStorage(); // Save constrained position
+      this.saveOverlayPosition(); // Save constrained position
     }
   }
 
