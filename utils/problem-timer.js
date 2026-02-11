@@ -31,6 +31,7 @@ class ProblemTimer {
 
     // Initialize
     this._initPromise = this.init();
+    this._saveQueue = Promise.resolve(); // Queue for serializing storage writes
   }
 
   static getInstance() {
@@ -270,23 +271,29 @@ class ProblemTimer {
   async saveToStorage() {
     if (!this.problemUrl) return;
 
-    try {
-      const storageKey = `problem_data_${this.problemUrl}`;
-      const result = await chrome.storage.local.get([storageKey]);
-      const problemData = result[storageKey] || {};
+    // Queue the save operation to prevent race conditions
+    this._saveQueue = this._saveQueue.then(async () => {
+      try {
+        const storageKey = `problem_data_${this.problemUrl}`;
+        const result = await chrome.storage.local.get([storageKey]);
+        const problemData = result[storageKey] || {};
 
-      problemData.problemStartTime = this.startTime;
-      problemData.pausedTime = this.pausedTime;
+        problemData.problemStartTime = this.startTime;
+        problemData.pausedTime = this.pausedTime;
 
-      await chrome.storage.local.set({ [storageKey]: problemData });
+        await chrome.storage.local.set({ [storageKey]: problemData });
 
-      // Save overlay position
-      await chrome.storage.local.set({
-        timer_overlay_position: { x: this.currentX, y: this.currentY },
-      });
-    } catch (error) {
-      console.error("[ProblemTimer] Error saving to storage:", error);
-    }
+        // Save overlay position
+        await chrome.storage.local.set({
+          timer_overlay_position: { x: this.currentX, y: this.currentY },
+        });
+      } catch (error) {
+        console.error("[ProblemTimer] Error saving to storage:", error);
+      }
+    });
+
+    // Wait for this save operation to complete
+    await this._saveQueue;
   }
 
   // ========== OVERLAY METHODS ==========
