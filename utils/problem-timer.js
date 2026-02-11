@@ -29,6 +29,10 @@ class ProblemTimer {
     this.currentX = window.innerWidth - 220; // Default to bottom-right
     this.currentY = window.innerHeight - 120;
 
+    // Drag cleanup functions
+    this._dragMouseMoveHandler = null;
+    this._dragMouseUpHandler = null;
+
     // Initialize
     this._initPromise = this.init();
     this._saveQueue = Promise.resolve(); // Queue for serializing storage writes
@@ -312,6 +316,19 @@ class ProblemTimer {
   }
 
   hideOverlay() {
+    // Clean up any active drag operation
+    if (this.isDragging) {
+      this.isDragging = false;
+      if (this._dragMouseMoveHandler) {
+        document.removeEventListener("mousemove", this._dragMouseMoveHandler);
+        this._dragMouseMoveHandler = null;
+      }
+      if (this._dragMouseUpHandler) {
+        document.removeEventListener("mouseup", this._dragMouseUpHandler);
+        this._dragMouseUpHandler = null;
+      }
+    }
+
     if (this.displayIntervalId) {
       clearInterval(this.displayIntervalId);
       this.displayIntervalId = null;
@@ -470,6 +487,10 @@ class ProblemTimer {
       this.overlay.style.transform = "scale(1.05)";
       this.overlay.style.cursor = "grabbing";
 
+      // Store handler references for cleanup
+      this._dragMouseMoveHandler = handleMouseMove;
+      this._dragMouseUpHandler = handleMouseUp;
+
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
 
@@ -508,6 +529,10 @@ class ProblemTimer {
 
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
+
+      // Clear handler references
+      this._dragMouseMoveHandler = null;
+      this._dragMouseUpHandler = null;
 
       // Save new position
       await this.saveOverlayPosition();
