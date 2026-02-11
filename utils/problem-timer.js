@@ -30,7 +30,7 @@ class ProblemTimer {
     this.currentY = window.innerHeight - 120;
 
     // Initialize
-    this.init();
+    this._initPromise = this.init();
   }
 
   static getInstance() {
@@ -85,6 +85,9 @@ class ProblemTimer {
 
   // Start tracking time for a problem
   async startTimer(problemUrl) {
+    // Ensure initialization is complete before proceeding
+    await this._initPromise;
+
     if (!problemUrl) {
       console.warn("[ProblemTimer] No problem URL provided");
       return;
