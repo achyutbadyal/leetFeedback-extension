@@ -16,6 +16,8 @@ class ProblemTimer {
     this.pausedTime = 0;
     this.isTabHidden = document.hidden;
     this.tabHiddenAt = null;
+    this.isPaused = false;
+    this.pausedAt = null;
 
     // Overlay state
     this.overlay = null;
@@ -140,6 +142,8 @@ class ProblemTimer {
     this.pausedTime = 0;
     this.isTabHidden = document.hidden;
     this.tabHiddenAt = null;
+    this.isPaused = false;
+    this.pausedAt = null;
     console.log("[ProblemTimer] Timer reset");
   }
 
@@ -152,9 +156,9 @@ class ProblemTimer {
         this.tabHiddenAt = Date.now();
         console.log("[ProblemTimer] Tab hidden, pausing timer");
       } else {
-        // Tab is now visible - add the hidden duration to pausedTime
+        // Tab is now visible - add the hidden duration to pausedTime (unless paused)
         this.isTabHidden = false;
-        if (this.tabHiddenAt && this.startTime) {
+        if (this.tabHiddenAt && this.startTime && !this.isPaused) {
           const hiddenDuration = Date.now() - this.tabHiddenAt;
           this.pausedTime += hiddenDuration;
           console.log(
@@ -181,6 +185,12 @@ class ProblemTimer {
       elapsed -= currentHiddenDuration;
     }
 
+    // If currently paused, don't count the current paused duration
+    if (this.isPaused && this.pausedAt) {
+      const currentPausedDuration = now - this.pausedAt;
+      elapsed -= currentPausedDuration;
+    }
+
     // Ensure elapsed time is always positive
     if (elapsed < 0) {
       console.warn(
@@ -201,6 +211,8 @@ class ProblemTimer {
     this.pausedTime = 0;
     this.isTabHidden = document.hidden;
     this.tabHiddenAt = null;
+    this.isPaused = false;
+    this.pausedAt = null;
 
     // Save reset state to storage
     await this.saveToStorage();
@@ -209,6 +221,58 @@ class ProblemTimer {
     this.updateDisplay();
 
     console.log("[ProblemTimer] Timer reset for current problem");
+  }
+
+  // Pause the timer (does not change startTime, accumulates pausedAt until resumed)
+  async pauseTimer() {
+    if (this.isPaused) return;
+    this.isPaused = true;
+    this.pausedAt = Date.now();
+
+    // Prevent rapid toggle while we persist the change
+    const btn = document.getElementById("leetfeedback-timer-pause-btn");
+    if (btn) btn.disabled = true;
+
+    await this.saveToStorage();
+
+    if (btn) btn.disabled = false;
+    this.updatePauseButton();
+    this.updateDisplay();
+  }
+
+  // Resume the timer and add paused duration to pausedTime
+  async resumeTimer() {
+    if (!this.isPaused) return;
+    const now = Date.now();
+    const pauseDuration = now - (this.pausedAt || now);
+    this.pausedTime += pauseDuration;
+    this.isPaused = false;
+    this.pausedAt = null;
+
+    // Prevent rapid toggle while we persist the change
+    const btn = document.getElementById("leetfeedback-timer-pause-btn");
+    if (btn) btn.disabled = true;
+
+    await this.saveToStorage();
+
+    if (btn) btn.disabled = false;
+    this.updatePauseButton();
+    this.updateDisplay();
+  }
+
+  updatePauseButton() {
+    const btn = document.getElementById("leetfeedback-timer-pause-btn");
+    if (!btn) return;
+    btn.textContent = this.isPaused ? "▶" : "⏸";
+    btn.title = this.isPaused ? "Resume timer" : "Pause timer";
+    btn.setAttribute(
+      "aria-label",
+      this.isPaused ? "Resume timer" : "Pause timer",
+    );
+    btn.setAttribute("aria-pressed", this.isPaused ? "true" : "false");
+    if (this.overlay) {
+      this.overlay.style.opacity = this.isPaused ? "0.45" : "0.6";
+    }
   }
 
   // Get values for content scripts to use when saving problem data
@@ -247,6 +311,8 @@ class ProblemTimer {
 
       this.startTime = problemData.problemStartTime;
       this.pausedTime = problemData.pausedTime || 0;
+      this.isPaused = !!problemData.isPaused;
+      this.pausedAt = problemData.pausedAt || null;
 
       // Load overlay position
       const positionResult = await chrome.storage.local.get([
@@ -275,15 +341,26 @@ class ProblemTimer {
   async saveToStorage() {
     if (!this.problemUrl) return;
 
-    // Queue the save operation to prevent race conditions
+    // Snapshot the state now so queued saves reflect the state at the time
+    // the operation was requested instead of reading current state later.
+    const snapshot = {
+      problemStartTime: this.startTime,
+      pausedTime: this.pausedTime,
+      isPaused: this.isPaused,
+      pausedAt: this.isPaused ? this.pausedAt : null,
+    };
+
+    // Queue the save operation to prevent race conditions (uses snapshot)
     this._saveQueue = this._saveQueue.then(async () => {
       try {
         const storageKey = `problem_data_${this.problemUrl}`;
         const result = await chrome.storage.local.get([storageKey]);
         const problemData = result[storageKey] || {};
 
-        problemData.problemStartTime = this.startTime;
-        problemData.pausedTime = this.pausedTime;
+        problemData.problemStartTime = snapshot.problemStartTime;
+        problemData.pausedTime = snapshot.pausedTime;
+        problemData.isPaused = snapshot.isPaused;
+        problemData.pausedAt = snapshot.isPaused ? snapshot.pausedAt : null;
 
         await chrome.storage.local.set({ [storageKey]: problemData });
       } catch (error) {
@@ -383,6 +460,43 @@ class ProblemTimer {
     `;
     timeDisplay.textContent = "00:00";
 
+    // Pause/Resume button
+    const pauseBtn = document.createElement("button");
+    pauseBtn.id = "leetfeedback-timer-pause-btn";
+    pauseBtn.style.cssText = `
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: rgba(255, 255, 255, 0.6);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    `;
+    pauseBtn.textContent = this.isPaused ? "▶" : "⏸";
+    pauseBtn.title = this.isPaused ? "Resume timer" : "Pause timer";
+
+    pauseBtn.addEventListener("mouseover", () => {
+      pauseBtn.style.background = "rgba(255, 255, 255, 0.2)";
+      pauseBtn.style.color = "white";
+    });
+    pauseBtn.addEventListener("mouseout", () => {
+      pauseBtn.style.background = "rgba(255, 255, 255, 0.1)";
+      pauseBtn.style.color = "rgba(255, 255, 255, 0.6)";
+    });
+    pauseBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (this.isPaused) {
+        await this.resumeTimer();
+      } else {
+        await this.pauseTimer();
+      }
+    });
+
     // Close button
     const closeBtn = document.createElement("button");
     closeBtn.style.cssText = `
@@ -454,11 +568,15 @@ class ProblemTimer {
 
     this.overlay.appendChild(icon);
     this.overlay.appendChild(timeDisplay);
+    this.overlay.appendChild(pauseBtn);
     this.overlay.appendChild(resetBtn);
     this.overlay.appendChild(closeBtn);
 
     // Add drag functionality
     this.setupDragging();
+
+    // Reflect paused state in the UI
+    this.updatePauseButton();
 
     // Hover effects using event listeners instead of inline handlers
     this.overlay.addEventListener("mouseover", () => {
