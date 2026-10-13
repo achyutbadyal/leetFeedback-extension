@@ -54,33 +54,45 @@ Traverse is an open-source browser extension that automatically tracks coding pr
    git clone https://github.com/QuickHasaCat/Traverse.git
    ```
 
-2. Load the extension — one folder, either browser
+2. Load the extension
 
-   **Chrome / Edge / Brave**
-   - Navigate to `chrome://extensions/`
-   - Enable Developer mode
-   - Click "Load unpacked" and select the extension directory
-   - Click the toolbar icon to open the side panel
-
-   **Firefox 140 or newer**
+   **Firefox 140 or newer** — the repository root *is* the Firefox extension
    - Navigate to `about:debugging#/runtime/this-firefox`
    - Click "Load Temporary Add-on…"
-   - Select `manifest.json` in the extension directory
+   - Select `manifest.json` in the repository root
    - Click the toolbar icon to open the sidebar
 
    Temporary add-ons are removed when Firefox closes. To keep it installed,
-   package the folder (`web-ext build`) and install the signed `.xpi`, or load
-   it from a profile's `extensions/` directory.
+   build an `.xpi` (see below) and install the signed package, or load it from a
+   profile's `extensions/` directory.
+
+   **Chrome / Edge / Brave** — build first, then load the build
+   - Run `npm install && npm run build`
+   - Navigate to `chrome://extensions/`, enable Developer mode
+   - Click "Load unpacked" and select the generated `dist/` directory
+   - Click the toolbar icon to open the side panel
+
+   Chrome cannot load the repository root: `manifest.json` is the Firefox
+   manifest, and Chrome needs different keys. `npm run build` derives the Chrome
+   one into `dist/`. See below.
 
 3. Configure settings through the extension panel
 
 ### Browser support
 
-Both browsers run the same code. The differences are confined to two surfaces,
-and both are declared side by side in `manifest.json`:
+Both browsers run the same code, but they need different manifests — Chrome and
+Firefox each reject some of the other's keys, and a browser that is handed a key
+it does not know prints a warning in its extension page.
+
+`manifest.json` is the **Firefox** manifest, because that is the filename a
+browser loads when the folder is loaded unpacked and this fork ships for Firefox
+first. It is also the single source of truth for everything the two share.
+Chrome's half is an overlay, `manifest.chrome.overlay.json`, applied by the
+build.
 
 | | Chrome | Firefox |
 |---|---|---|
+| Manifest | derived from `manifest.json` + overlay | `manifest.json` |
 | Background | `background.service_worker` (service worker) | `background.scripts` (event page) |
 | Panel | `side_panel` + `chrome.sidePanel` | `sidebar_action` + `chrome.sidebarAction` |
 | Minimum version | Chrome 121 | Firefox 140 |
@@ -92,16 +104,19 @@ added in 128, and the mandatory `data_collection_permissions` declaration
 arrived in 140 (it is the current ESR baseline). Desktop only — Firefox for
 Android has no sidebar, so `gecko_android` is deliberately not declared.
 
-Validate a change against Firefox's schema before shipping:
-
 ```bash
-npx web-ext lint --source-dir .
+npm run build            # Chrome  -> ~/Desktop/traverse-v<version>.zip
+npm run build:firefox    # Firefox -> ~/Desktop/traverse-firefox-v<version>.zip
+npm run lint:firefox     # validate the Firefox manifest and sources
+npm test                 # the node test suite, including the manifest guard
 ```
 
-Two warnings are expected and benign: `sidePanel` is an unknown permission to
-Firefox but is required by Chrome's Side Panel API, and `background.service_worker`
-is ignored by Firefox, which uses `background.scripts` instead. Firefox 140+
-runs `background.scripts`; Chrome 121+ runs `service_worker`.
+`tests/manifest.test.js` pins the split: that the Firefox manifest carries no
+Chrome-only key, that the overlay defines nothing but Chrome keys, that the
+derived Chrome manifest is complete, and that the two agree on everything
+shared. The permission lists differ by exactly `sidePanel` — the one thing the
+overlay restates rather than inherits, and therefore the one thing that can
+drift.
 
 ## Authentication Backend
 

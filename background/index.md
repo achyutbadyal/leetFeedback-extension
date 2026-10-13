@@ -7,9 +7,10 @@ CORS proxy and the owner of auth storage, nothing more. It holds **no problem
 state**, because the browser terminates the background context whenever it goes
 idle.
 
-Chrome runs this as a **service worker** (`background.service_worker`); Firefox
-has no MV3 service worker and runs it as an **event page**
-(`background.scripts`). Both keys are declared in `manifest.json` — see §2.
+Chrome runs this as a **service worker** (`background.service_worker`, declared
+in `manifest.chrome.overlay.json`); Firefox has no MV3 service worker and runs it
+as an **event page** (`background.scripts`, declared in `manifest.json`). See §2
+and root `index.md` invariant 16.
 
 ## 2. Modules
 
@@ -33,7 +34,8 @@ sync:**
 The `importScripts` call is therefore wrapped in a
 `typeof importScripts === 'function'` guard. Adding a module to one list without
 the other silently breaks that browser — `background.test.js` covers the Chrome
-path.
+path, and `tests/manifest.test.js` asserts the manifest list is exactly the
+`importScripts` arguments plus the entry file.
 
 ## 3. Data flow
 
@@ -115,7 +117,7 @@ session.
   hand the session to the background directly there. Firefox uses the
   `platforms/website-sync.js` content script instead, which writes the same
   `chrome.storage.local` keys. Keep both paths — the `externally_connectable`
-  block still applies to Chrome.
+  block in `manifest.chrome.overlay.json` still applies to Chrome.
 - Removed in the refactor: the `getUserSolution` GFG DOM-extraction cascade,
   and the `testGitHubConnection` / `initializeConfig` / `CONTENT_SCRIPT_READY`
   handlers — none had a single call site.
@@ -126,7 +128,7 @@ session.
 | Change | File |
 |---|---|
 | A new cross-origin call a content script needs | add to `RUNTIME_HANDLERS` in `background.js` |
-| A new external origin allowed to sync auth | `core/config.js` → `allowedExternalOrigins` **and** `manifest.json` → `externally_connectable` |
+| A new external origin allowed to sync auth | `core/config.js` → `allowedExternalOrigins` **and** `manifest.chrome.overlay.json` → `externally_connectable` (Chrome only — Firefox uses the `website-sync.js` content script) |
 | Startup / install behaviour | `markSessionRestarted` in `background.js` |
 | A storage key used by the worker | `core/config.js` only |
 | The recon upload target, headers or timeout | the `RECON_UPLOAD` handler in `background.js` |
