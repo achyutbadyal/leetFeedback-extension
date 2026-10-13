@@ -159,7 +159,12 @@ function verifyReferencedFiles() {
   const add = (rel) => rel && referenced.add(rel);
 
   add(manifest.background && manifest.background.service_worker);
+  // Firefox has no MV3 service worker and loads the background as an event page
+  // from this list instead, so its entries are just as load-bearing.
+  for (const script of (manifest.background && manifest.background.scripts) || []) add(script);
   add(manifest.side_panel && manifest.side_panel.default_path);
+  add(manifest.sidebar_action && manifest.sidebar_action.default_panel);
+  for (const icon of Object.values((manifest.sidebar_action && manifest.sidebar_action.default_icon) || {})) add(icon);
   for (const icon of Object.values(manifest.icons || {})) add(icon);
   for (const icon of Object.values((manifest.action && manifest.action.default_icon) || {})) add(icon);
   for (const cs of manifest.content_scripts || []) for (const js of cs.js || []) add(js);
@@ -167,14 +172,18 @@ function verifyReferencedFiles() {
     for (const res of war.resources || []) add(res);
   }
 
-  // background.js pulls core modules via importScripts('…').
-  const worker = path.join(DIST, manifest.background.service_worker);
-  const importScripts = fs
-    .readFileSync(worker, 'utf8')
-    .match(/importScripts\(([^)]*)\)/g) || [];
-  for (const call of importScripts) {
-    for (const match of call.matchAll(/['"]([^'"]+)['"]/g)) {
-      add(path.join(path.dirname(manifest.background.service_worker), match[1]));
+  // background.js pulls core modules via importScripts('…') on Chrome. The call
+  // is guarded for Firefox, but the argument list still has to resolve.
+  const workerPath = manifest.background && manifest.background.service_worker;
+  if (workerPath) {
+    const worker = path.join(DIST, workerPath);
+    const importScripts = fs
+      .readFileSync(worker, 'utf8')
+      .match(/importScripts\(([^)]*)\)/g) || [];
+    for (const call of importScripts) {
+      for (const match of call.matchAll(/['"]([^'"]+)['"]/g)) {
+        add(path.join(path.dirname(workerPath), match[1]));
+      }
     }
   }
 

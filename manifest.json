@@ -8,6 +8,19 @@
         "48": "icons/48.png",
         "128": "icons/128.png"
     },
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "traverse@traverses.tech",
+            "strict_min_version": "140.0",
+            "data_collection_permissions": {
+                "required": [
+                    "authenticationInfo",
+                    "browsingActivity",
+                    "websiteContent"
+                ]
+            }
+        }
+    },
     "permissions": [
         "alarms",
         "storage",
@@ -53,7 +66,13 @@
         "https://chromewebstore.google.com/*"
     ],
     "background": {
-        "service_worker": "background/background.js"
+        "service_worker": "background/background.js",
+        "scripts": [
+            "core/config.js",
+            "core/logger.js",
+            "background/leetcode-import.js",
+            "background/background.js"
+        ]
     },
     "externally_connectable": {
         "matches": [
@@ -334,5 +353,15 @@
     },
     "side_panel": {
         "default_path": "sidepanel/sidepanel.html"
+    },
+    "sidebar_action": {
+        "default_title": "Open Traverse",
+        "default_panel": "sidepanel/sidepanel.html",
+        "default_icon": {
+            "16": "icons/16.png",
+            "48": "icons/48.png",
+            "128": "icons/128.png"
+        },
+        "open_at_install": false
     }
 }

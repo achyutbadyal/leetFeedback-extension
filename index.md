@@ -1,8 +1,14 @@
-# Traverse Chrome Extension — Architecture Map
+# Traverse Extension — Architecture Map
 
 MV3 extension that tracks DSA practice on LeetCode, GeeksforGeeks, TakeUforward,
 CodeChef and Naukri Code360, and syncs each solved problem to the Traverse
 backend (optionally mirroring it to GitHub).
+
+It runs on **Chrome and Firefox** from one manifest. The only structural
+divergences are the background context (Chrome service worker vs Firefox event
+page) and the panel surface (Chrome `side_panel` vs Firefox `sidebar_action`);
+both are declared side by side in `manifest.json` and feature-detected in code.
+See §3 invariants 2 and 11.
 
 It also carries a **platform recon** mode: on 18 DSA platforms that have no
 verified adapter yet, it records a real session and reports the judge API back,
@@ -69,7 +75,10 @@ Two more entry points exist:
   (see `platforms/index.md`). They funnel into the same `capture*`/`*Verdict`
   methods, so the pipeline is identical either way.
 - **Website auth sync** — `platforms/website-sync.js` and the background
-  worker's `externally_connectable` handler both write the same auth keys.
+  worker's `externally_connectable` handler both write the same auth keys. On
+  Firefox only the content-script path is live: Firefox does not let web pages
+  message an extension (bug 1319168), so `externally_connectable` is Chrome-only.
+  Both paths stay in the tree.
 
 ---
 
@@ -112,8 +121,10 @@ off for LeetCode, TakeUforward, and Traverse's own surfaces. See
    string. (`core/auth.js` and `platforms/website-sync.js` carry literals only as
    a non-extension fallback, and they must match `config.keys`.)
 2. **No build step.** Plain ES5-compatible JS loaded by `<script>` order in
-   `manifest.json` and by `importScripts`. No modules, no bundler, no
+   `manifest.json`, by `importScripts` (Chrome service worker) and by
+   `background.scripts` (Firefox event page). No modules, no bundler, no
    TypeScript. `globalThis.Traverse` (`T`) is the namespace; files attach to it.
+   The two background lists must stay identical in content and order.
 3. **Script order in `manifest.json` is a dependency graph.** A file may only
    use `T.*` entries loaded before it. `core/platform-adapter.js` must come
    before any `platforms/*.js`.
@@ -139,7 +150,8 @@ off for LeetCode, TakeUforward, and Traverse's own surfaces. See
    CTA's colour, re-based on the brand chroma band (`sidepanel/index.md` §1). A
    visual change needs an explicit request; it never rides along with a refactor.
 10. **Background handlers must `return true`** when responding asynchronously.
-11. **The service worker holds no problem state.** MV3 terminates it when idle;
+11. **The background context holds no problem state.** Chrome terminates the
+    service worker when idle and Firefox unloads the event page the same way;
     everything must be rehydrated from `chrome.storage`.
 12. **Recon must work with zero user setup.** The ingest token is baked into
     `config.js` (`recon.defaultToken`) and nothing user-facing gates recording —

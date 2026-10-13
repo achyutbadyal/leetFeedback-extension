@@ -8,6 +8,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/Chrome-Extension-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Chrome Extension">
+  <img src="https://img.shields.io/badge/Firefox-Extension-FF7139?style=flat-square&logo=firefoxbrowser&logoColor=white" alt="Firefox Extension">
   <img src="https://img.shields.io/badge/License-MIT-45B7D1?style=flat-square" alt="MIT License">
   <img src="https://img.shields.io/badge/Status-Beta-FF6B6B?style=flat-square" alt="Beta Status">
   <img src="https://img.shields.io/badge/Free-Forever-4ECDC4?style=flat-square" alt="Free Forever">
@@ -53,12 +54,54 @@ Traverse is an open-source browser extension that automatically tracks coding pr
    git clone https://github.com/QuickHasaCat/Traverse.git
    ```
 
-2. Load extension in Chrome
+2. Load the extension — one folder, either browser
+
+   **Chrome / Edge / Brave**
    - Navigate to `chrome://extensions/`
    - Enable Developer mode
    - Click "Load unpacked" and select the extension directory
+   - Click the toolbar icon to open the side panel
 
-3. Configure settings through the extension popup
+   **Firefox 140 or newer**
+   - Navigate to `about:debugging#/runtime/this-firefox`
+   - Click "Load Temporary Add-on…"
+   - Select `manifest.json` in the extension directory
+   - Click the toolbar icon to open the sidebar
+
+   Temporary add-ons are removed when Firefox closes. To keep it installed,
+   package the folder (`web-ext build`) and install the signed `.xpi`, or load
+   it from a profile's `extensions/` directory.
+
+3. Configure settings through the extension panel
+
+### Browser support
+
+Both browsers run the same code. The differences are confined to two surfaces,
+and both are declared side by side in `manifest.json`:
+
+| | Chrome | Firefox |
+|---|---|---|
+| Background | `background.service_worker` (service worker) | `background.scripts` (event page) |
+| Panel | `side_panel` + `chrome.sidePanel` | `sidebar_action` + `chrome.sidebarAction` |
+| Minimum version | Chrome 121 | Firefox 140 |
+| Website → extension auth | `externally_connectable` | `platforms/website-sync.js` content script |
+
+The Firefox floor is **140**, for two reasons: the network interceptor is
+injected into the page's own JS context with `"world": "MAIN"`, which Firefox
+added in 128, and the mandatory `data_collection_permissions` declaration
+arrived in 140 (it is the current ESR baseline). Desktop only — Firefox for
+Android has no sidebar, so `gecko_android` is deliberately not declared.
+
+Validate a change against Firefox's schema before shipping:
+
+```bash
+npx web-ext lint --source-dir .
+```
+
+Two warnings are expected and benign: `sidePanel` is an unknown permission to
+Firefox but is required by Chrome's Side Panel API, and `background.service_worker`
+is ignored by Firefox, which uses `background.scripts` instead. Firefox 140+
+runs `background.scripts`; Chrome 121+ runs `service_worker`.
 
 ## Authentication Backend
 
@@ -79,8 +122,8 @@ rather than by scraping the page.
 | `page/` | MAIN-world scripts injected into the tracked sites (network interceptor, editor bridge) |
 | `platforms/` | One adapter per site, plus the website auth bridge |
 | `ui/` | Injected UI: toasts and the hint prompt |
-| `background/` | Service worker: backend request proxy + auth storage owner |
-| `sidepanel/` | The extension's own interface |
+| `background/` | Background context: backend request proxy + auth storage owner (service worker on Chrome, event page on Firefox) |
+| `sidepanel/` | The extension's own interface, rendered as a side panel (Chrome) or a sidebar (Firefox) |
 
 Start with [`index.md`](index.md) — it is the architecture map, and every
 directory has its own `index.md`. Migration history and the remaining phases are
